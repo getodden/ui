@@ -68,4 +68,7 @@
     @if ($deletedId)
         <p id="deleted">Deleted item {{ $deletedId }}</p>
     @endif
+
+    <livewire:editor-demo />
+    <livewire:table-demo />
 </div>

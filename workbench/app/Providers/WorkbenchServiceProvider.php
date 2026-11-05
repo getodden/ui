@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Workbench\App\Livewire\Demo;
+use Workbench\App\Livewire\EditorDemo;
+use Workbench\App\Livewire\TableDemo;
 
 final class WorkbenchServiceProvider extends ServiceProvider
 {
@@ -16,6 +18,8 @@ final class WorkbenchServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../../resources/views', 'workbench');
 
         Livewire::component('demo', Demo::class);
+        Livewire::component('editor-demo', EditorDemo::class);
+        Livewire::component('table-demo', TableDemo::class);
         Route::middleware('web')->get('/', Demo::class);
     }
 }
