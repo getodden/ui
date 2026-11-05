@@ -4,6 +4,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Odden UI demo</title>
+    <script type="importmap">{!! json_encode(['imports' => \Workbench\App\ImportMap::imports()], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) !!}</script>
+    <script type="module">
+        import { registerEditor } from '/__workbench/js/editor.js'
+
+        document.addEventListener('alpine:init', () => registerEditor(window.Alpine))
+    </script>
     <style>
         .fixed { position: fixed; }
         .relative { position: relative; }

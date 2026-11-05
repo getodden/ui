@@ -41,6 +41,8 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::select>` | the field props, `options` (value => label), `placeholder`, `value`, and a slot |
 | `<x-ui::toggle>` | the field props; renders a switch |
 | `<x-ui::icon>` | `name` (for example `fas-check`), `size` sm, md, lg |
+| `<x-ui::editor>` | the field props, `format` html or json, `toolbar` (list of tools, `[]` for none), `mentions`, `mention-search`, `mention-char` |
+| `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
 
@@ -65,7 +67,82 @@ Two fields bound to the same key on one page get the same id, so give one of the
 
 The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first focusable element. The dialog is teleported to `<body>`, and the most recently opened one is always on top, so a `ui::confirm` can sit anywhere in the page. If the modal is removed from the page while open, focus returns to its opener. Escape closes only the modal that holds focus, so a modal opened from inside another closes first. A modal without a `heading` throws.
 
+### Editor
+
+A TipTap rich-text field. It reads and writes the same HTML and JSON as Filament's RichEditor for paragraphs, headings 1 to 4, bold, italic, underline, strike, inline code, code blocks, links, lists, blockquotes, rules and mentions. Text alignment, sub- and superscript, colours, tables, images and custom blocks are not supported: stored HTML loses them when saved, and a stored JSON document holding them opens read-only with a notice, so it is never overwritten. Install TipTap 3 in your app and register the Alpine data before Alpine starts:
+
+```bash
+npm install @tiptap/core@^3 @tiptap/pm@^3 @tiptap/starter-kit@^3 @tiptap/extension-mention@^3 @tiptap/suggestion@^3
+```
+
+```js
+import { registerEditor } from '../../vendor/getodden/ui/resources/js/editor.js'
+
+document.addEventListener('alpine:init', () => registerEditor(window.Alpine))
+```
+
+```blade
+<x-ui::editor label="Reply" wire:model="body" mention-search="searchPeople" />
+```
+
+Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Links accept http, https, mailto, tel and relative addresses. `wire:model` follows Livewire 4: plain and `.blur` update the component without a request, `.live` sends after a 150 ms pause (`.live.debounce.500ms` and `.live.throttle.500ms` change it), and `.live.blur` sends on blur when the text changed. As in Livewire, `.live.throttle` alone can hold the last keystrokes until the next change or request.
+
+Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, which is read once and is visible in the page source, or from `mention-search`, a method on your component that takes the query and returns that same shape. Anyone can call that method with any string, so check who may see the results, cap the query and the number of results, return only `id` and `label`, and mark it `#[Renderless]`.
+
+The bound value is whatever the browser sends, so treat it as untrusted. Before you save it or print it with `{!! !!}`, pass HTML through `Odden\Ui\Support\RichHtml::clean()` and a `format="json"` document through `RichJson::clean()`. Both keep only what the editor can produce. Both throw a `LengthException` above their size limits (`RichHtml::MAXIMUM_BYTES`, `MAXIMUM_TAGS`, `MAXIMUM_TAG_BYTES`, `RichJson::MAXIMUM_NODES`, `MAXIMUM_DEPTH`), so validate the length first. A single tag over 8 KiB, such as a very long link or a large pasted comment, counts as too long.
+
+### Table
+
+```blade
+<x-ui::table caption="Contacts" :columns="['name' => 'Name', 'email' => 'Email']" :state="$this->recordTableState()" :records="$contacts">
+    <x-slot:toolbar>
+        <x-ui::input type="search" label="Search" wire:model.live.debounce.250ms="search" />
+    </x-slot:toolbar>
+
+    @foreach ($contacts as $contact)
+        <tr wire:key="{{ $contact->id }}">...</tr>
+    @endforeach
+</x-ui::table>
+```
+
+Sortable headers are buttons, and the sorted column carries `aria-sort`. When there are no records, the table shows the `empty` slot. While a request runs, it is marked `aria-busy`. Pagination links appear when there is more than one page.
+
 ## Livewire traits
+
+`WithRecordTable` holds search, sort, filters, per-page and pagination state in the URL. Every key comes from your allow-lists and is checked each time it is used, so a value from the URL or `$wire.$set` that is not on a list falls back to the default.
+
+```php
+use Odden\Ui\Livewire\Concerns\WithRecordTable;
+
+class Contacts extends Component
+{
+    use WithRecordTable;
+
+    protected function sortableColumns(): array
+    {
+        return ['name' => 'name', 'created' => 'created_at'];
+    }
+
+    protected function searchableColumns(): array
+    {
+        return ['name', 'email'];
+    }
+
+    protected function recordFilters(): array
+    {
+        return ['status' => fn (Builder $query, string $value) => $query->where('status', Status::tryFrom($value) ?? Status::Active)];
+    }
+
+    public function render(): View
+    {
+        return view('contacts', ['contacts' => $this->paginateRecords(Contact::query())]);
+    }
+}
+```
+
+A filter closure receives the raw string from the request, so validate it there. Override `defaultSort()`, `defaultDirection()`, `perPageOptions()` or `applySearch()` when you need to.
+
+A chosen sort replaces any order on your base query, and the model key always breaks ties, so pages stay stable. Search compares `lower(column) like lower(term)`. On PostgreSQL that fails for columns that are not text, such as integers, uuids and json, so search those in your own `applySearch()`. On SQLite only ASCII letters match regardless of case. A page past the end shows the last page.
 
 `WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds, and hovering or focusing the toasts holds them.
 
@@ -103,6 +180,8 @@ class Contacts extends Component
 - The toast region is `aria-live="polite"` and is in the page from the start. Danger and warning alerts use `role="alert"`, the others `role="status"`.
 - Control borders (inputs, selects, textareas, outline buttons) meet the 3:1 non-text contrast of WCAG 1.4.11. A disabled link button has no `href` and no click handlers.
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
+- The editor's toolbar is one tab stop with arrow-key movement and `aria-pressed` on toggles; the editable area is a labelled `textbox`, and mention suggestions are a `listbox` it points at with `aria-activedescendant`.
+- Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
 
 ## Development
 
