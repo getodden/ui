@@ -21,7 +21,7 @@ final class Html
             LIBXML_NOERROR,
         );
 
-        foreach ($document->querySelectorAll('template[x-teleport]') as $teleport) {
+        while (($teleport = $document->querySelector('template[x-teleport]')) !== null) {
             $teleport->outerHTML = $teleport->innerHTML;
         }
 

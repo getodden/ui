@@ -40,10 +40,9 @@
     }
 
     $trackLoading = $attributes->whereStartsWith('wire:click')->isNotEmpty();
-    $busyObserver = "new MutationObserver(() => \$el.hasAttribute('data-loading') ? \$el.setAttribute('aria-busy', 'true') : \$el.removeAttribute('aria-busy')).observe(\$el, { attributes: true, attributeFilter: ['data-loading'] })";
-    $initExpression = collect([$trackLoading ? $busyObserver : null, $attributes->get('x-init')])->filter()->implode('; ');
+    $busyObserver = "const button = \$el.parentElement; new MutationObserver(() => button.hasAttribute('data-loading') ? button.setAttribute('aria-busy', 'true') : button.removeAttribute('aria-busy')).observe(button, { attributes: true, attributeFilter: ['data-loading'] })";
 
-    $elementAttributes = $attributes->except('x-init')->merge(array_filter([
+    $elementAttributes = $attributes->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
         'disabled' => $tag === 'button' && $disabled ? true : null,
         'href' => $tag === 'a' && ! $disabled ? $href : null,
@@ -51,13 +50,13 @@
         'tabindex' => $disabledLink ? '-1' : null,
         'aria-disabled' => $disabledLink ? 'true' : null,
         'aria-label' => $iconOnly ? $label : null,
-    ], fn ($value) => $value !== null))->merge($initExpression === '' ? [] : ['x-init' => $initExpression], false)->class($classes);
+    ], fn ($value) => $value !== null))->class($classes);
 @endphp
 
 <{{ $tag }} {{ $elementAttributes }}>
     <x-ui::icon :name="$icon" />
     {{ $slot }}
     @if ($trackLoading)
-        <x-ui::icon name="fas-spinner" class="hidden animate-spin group-data-loading/ui-button:inline-block" />
+        <x-ui::icon name="fas-spinner" class="hidden animate-spin group-data-loading/ui-button:inline-block" :x-init="$busyObserver" />
     @endif
 </{{ $tag }}>

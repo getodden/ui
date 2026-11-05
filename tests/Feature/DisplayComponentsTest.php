@@ -63,22 +63,22 @@ it('tracks the loading state of a button that triggers a livewire action', funct
     $button = Html::render('<x-ui::button wire:click.prevent="remove(\'a&b\')">Remove</x-ui::button>')->querySelector('button');
 
     expect($button->hasAttribute('wire:target'))->toBeFalse()
-        ->and($button->hasAttribute('x-init'))->toBeTrue()
-        ->and($button->getAttribute('x-init'))->toContain('data-loading', 'aria-busy')
+        ->and($button->hasAttribute('x-init'))->toBeFalse()
+        ->and($button->querySelector('svg')->getAttribute('x-init'))->toContain('data-loading', 'aria-busy')
         ->and($button->querySelector('svg')->getAttribute('class'))->toContain('group-data-loading/ui-button:inline-block')
         ->and($button->getAttribute('class'))->toContain('group/ui-button');
 });
 
-it('keeps a consumer x-init next to the busy observer', function (): void {
-    $button = Html::render('<x-ui::button wire:click="remove" x-init="window.started = true">Remove</x-ui::button>')->querySelector('button');
+it('leaves a consumer x-init on a button with a livewire action untouched', function (): void {
+    $button = Html::render('<x-ui::button wire:click="remove" x-init="setup">Remove</x-ui::button>')->querySelector('button');
 
-    expect($button->getAttribute('x-init'))->toContain('window.started = true', 'aria-busy');
+    expect($button->getAttribute('x-init'))->toBe('setup');
 });
 
 it('passes a consumer x-init with quotes and ampersands through unchanged', function (string $wireClick): void {
     $button = Html::render('<x-ui::button '.$wireClick.' x-init="say(&quot;{{ $name }}&quot;)">Say</x-ui::button>', ['name' => 'Tom & "Jo"'])->querySelector('button');
 
-    expect($button->getAttribute('x-init'))->toEndWith('say("Tom & "Jo"")');
+    expect($button->getAttribute('x-init'))->toBe('say("Tom & "Jo"")');
 })->with([
     'without a livewire action' => [''],
     'with a livewire action' => ['wire:click="remove"'],
@@ -102,6 +102,13 @@ it('unwraps teleports without swallowing the markup after other templates', func
 
     expect($document->querySelector('body > #teleported'))->not->toBeNull()
         ->and($document->querySelector('body > #after'))->not->toBeNull()
+        ->and($document->querySelector('template[x-teleport]'))->toBeNull();
+});
+
+it('unwraps a teleport nested inside another teleport', function (): void {
+    $document = Html::render('<template x-teleport="body"><div><template x-teleport="body"><p id="inner">In</p></template></div></template>');
+
+    expect($document->querySelector('body > div > #inner'))->not->toBeNull()
         ->and($document->querySelector('template[x-teleport]'))->toBeNull();
 });
 
