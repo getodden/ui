@@ -75,6 +75,15 @@ it('keeps a consumer x-init next to the busy observer', function (): void {
     expect($button->getAttribute('x-init'))->toContain('window.started = true', 'aria-busy');
 });
 
+it('passes a consumer x-init with quotes and ampersands through unchanged', function (string $wireClick): void {
+    $button = Html::render('<x-ui::button '.$wireClick.' x-init="say(&quot;{{ $name }}&quot;)">Say</x-ui::button>', ['name' => 'Tom & "Jo"'])->querySelector('button');
+
+    expect($button->getAttribute('x-init'))->toEndWith('say("Tom & "Jo"")');
+})->with([
+    'without a livewire action' => [''],
+    'with a livewire action' => ['wire:click="remove"'],
+]);
+
 it('keeps a consumer x-init on a button without a livewire action', function (): void {
     $button = Html::render('<x-ui::button x-init="window.started = true">Plain</x-ui::button>')->querySelector('button');
 
@@ -91,8 +100,8 @@ it('shows no loading state on a button without a livewire action', function (): 
 it('unwraps teleports without swallowing the markup after other templates', function (): void {
     $document = Html::render('<template x-teleport="body"><p id="teleported">In</p></template><template x-for="n in [1]"><i></i></template><p id="after">After</p>');
 
-    expect($document->getElementById('teleported'))->not->toBeNull()
-        ->and($document->getElementById('after'))->not->toBeNull()
+    expect($document->querySelector('body > #teleported'))->not->toBeNull()
+        ->and($document->querySelector('body > #after'))->not->toBeNull()
         ->and($document->querySelector('template[x-teleport]'))->toBeNull();
 });
 

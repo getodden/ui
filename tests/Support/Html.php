@@ -16,12 +16,16 @@ final class Html
      */
     public static function render(string $template, array $data = []): HTMLDocument
     {
-        $html = preg_replace('#<template x-teleport="[^"]*">|</template>#', '', Blade::render($template, $data));
-
-        return HTMLDocument::createFromString(
-            '<body>'.$html.'</body>',
+        $document = HTMLDocument::createFromString(
+            '<body>'.Blade::render($template, $data).'</body>',
             LIBXML_NOERROR,
         );
+
+        foreach ($document->querySelectorAll('template[x-teleport]') as $teleport) {
+            $teleport->outerHTML = $teleport->innerHTML;
+        }
+
+        return $document;
     }
 
     /**

@@ -41,7 +41,7 @@
 
     $trackLoading = $attributes->whereStartsWith('wire:click')->isNotEmpty();
     $busyObserver = "new MutationObserver(() => \$el.hasAttribute('data-loading') ? \$el.setAttribute('aria-busy', 'true') : \$el.removeAttribute('aria-busy')).observe(\$el, { attributes: true, attributeFilter: ['data-loading'] })";
-    $initExpression = collect([$attributes->get('x-init'), $trackLoading ? $busyObserver : null])->filter()->implode('; ');
+    $initExpression = collect([$trackLoading ? $busyObserver : null, $attributes->get('x-init')])->filter()->implode('; ');
 
     $elementAttributes = $attributes->except('x-init')->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
@@ -51,8 +51,7 @@
         'tabindex' => $disabledLink ? '-1' : null,
         'aria-disabled' => $disabledLink ? 'true' : null,
         'aria-label' => $iconOnly ? $label : null,
-        'x-init' => $initExpression === '' ? null : $initExpression,
-    ], fn ($value) => $value !== null))->class($classes);
+    ], fn ($value) => $value !== null))->merge($initExpression === '' ? [] : ['x-init' => $initExpression], false)->class($classes);
 @endphp
 
 <{{ $tag }} {{ $elementAttributes }}>
