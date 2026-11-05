@@ -209,16 +209,34 @@ it('renders the unreadable-content message wired to the editor', function (): vo
         ->and($dom->querySelector('[x-data]')->getAttribute('x-data'))->toContain(escapedForAttribute('"unreadableId":"ui-body-unreadable"'));
 });
 
-it('always deferred-entangles and commits through a debounce', function (string $modifier, string $expected): void {
+it('always deferred-entangles', function (): void {
+    expect(editorConfig('wire:model.live="body"'))->toContain("body', false)");
+});
+
+it('puts only the id and label of each mention into the page', function (): void {
+    $users = collect([new Fluent(['id' => 1, 'label' => 'Ada', 'email' => 'ada@example.com', 'token' => 'secret'])]);
+
+    $config = Html::render('<x-ui::editor label="Body" name="body" :mentions="$users" />', ['users' => $users])->querySelector('[x-data]')->getAttribute('x-data');
+
+    expect($config)->toContain(escapedForAttribute('"mentions":[{"id":1,"label":"Ada"}]'))
+        ->and($config)->not->toContain('ada@example.com')
+        ->and($config)->not->toContain('secret');
+});
+
+it('follows Livewire 4 for what each wire:model modifier sends', function (string $modifier, array $expected): void {
     $config = Html::render("<x-ui::editor label=\"Body\" wire:model{$modifier}=\"body\" />")->querySelector('[x-data]')->getAttribute('x-data');
 
-    expect($config)->toContain("body', false)")
-        ->and($config)->toContain(escapedForAttribute($expected));
+    preg_match('/'.preg_quote(chr(92).'u0022commit'.chr(92).'u0022:', '/').'(\{[^}]*\})/', $config, $matches);
+
+    expect(json_decode(str_replace(chr(92).'u0022', '"', $matches[1]), true))->toBe($expected);
 })->with([
-    'deferred' => ['', '"commit":{"live":false,"blur":false,"delay":150}'],
-    'live' => ['.live', '"commit":{"live":true,"blur":false,"delay":150}'],
-    'live debounce' => ['.live.debounce.500ms', '"commit":{"live":true,"blur":false,"delay":500}'],
-    'live debounce seconds' => ['.live.debounce.2s', '"commit":{"live":true,"blur":false,"delay":2000}'],
-    'blur' => ['.blur', '"commit":{"live":false,"blur":true,"delay":150}'],
-    'live blur' => ['.live.blur', '"commit":{"live":true,"blur":true,"delay":150}'],
+    'deferred' => ['', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
+    'blur is local only' => ['.blur', ['live' => false, 'blur' => false, 'syncOnBlur' => true, 'throttle' => false, 'delay' => 150]],
+    'live' => ['.live', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
+    'live blur is network on blur only' => ['.live.blur', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
+    'blur live syncs on blur then debounces' => ['.blur.live', ['live' => true, 'blur' => false, 'syncOnBlur' => true, 'throttle' => false, 'delay' => 150]],
+    'live debounce' => ['.live.debounce.500ms', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 500]],
+    'live throttle' => ['.live.throttle.2s', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => true, 'delay' => 2000]],
+    'debounce without live sends nothing' => ['.debounce.500ms', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
+    'lazy sends on change' => ['.lazy', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
 ]);

@@ -159,6 +159,8 @@ export default function editor(config) {
     let instance = null
     let observer = null
     let commitTimer = null
+    let pendingSync = false
+    let uncommitted = false
     let removeListeners = null
     let commitSuggestion = null
 
@@ -179,7 +181,9 @@ export default function editor(config) {
             const extensions = [
                 StarterKit.configure({
                     heading: { levels: [1, 2, 3, 4] },
+                    trailingNode: false,
                     link: {
+                        HTMLAttributes: { target: null, rel: null },
                         openOnClick: false,
                         autolink: true,
                         defaultProtocol: 'https',
@@ -208,7 +212,7 @@ export default function editor(config) {
                 element: this.$refs.host,
                 extensions,
                 content: this.contentFor(this.state),
-                enableContentCheck: true,
+                enableContentCheck: config.format === 'json',
                 editorProps: { attributes: this.attributes() },
                 onContentError: () => {
                     this.unreadable = true
@@ -218,20 +222,33 @@ export default function editor(config) {
                         return
                     }
 
-                    this.state = this.output()
-                    this.$dispatch('ui-editor-input', { value: this.state })
-                    this.scheduleCommit()
+                    if (config.commit.syncOnBlur) {
+                        pendingSync = true
+
+                        return
+                    }
+
+                    this.sync()
                 },
                 onTransaction: () => this.refreshActive(),
                 onBlur: () => {
-                    if (config.commit.blur && !this.unreadable) {
+                    if (this.unreadable) {
+                        return
+                    }
+
+                    if (pendingSync) {
+                        pendingSync = false
+                        this.sync()
+                    }
+
+                    if (config.commit.blur && uncommitted) {
                         this.commit()
                     }
                 },
             })
 
             if (this.unreadable) {
-                instance.setEditable(false)
+                instance.setEditable(false, false)
                 this.syncAttributes()
             }
 
@@ -242,18 +259,28 @@ export default function editor(config) {
                     return
                 }
 
-                this.unreadable = false
-                instance.commands.setContent(this.contentFor(value), { emitUpdate: false })
-                instance.setEditable(!this.unreadable)
-                this.syncAttributes()
+                this.loadContent(value)
             })
 
             observer = new MutationObserver(() => this.syncAttributes())
             observer.observe(this.$refs.meta, { attributes: true })
         },
 
+        sync() {
+            this.state = this.output()
+            uncommitted = true
+            this.$dispatch('ui-editor-input', { value: this.state })
+            this.scheduleCommit()
+        },
+
         scheduleCommit() {
-            if (!config.commit.live) {
+            if (!config.commit.live || config.commit.blur) {
+                return
+            }
+
+            if (config.commit.throttle) {
+                commitTimer ??= setTimeout(() => this.commit(), config.commit.delay)
+
                 return
             }
 
@@ -263,7 +290,32 @@ export default function editor(config) {
 
         commit() {
             clearTimeout(commitTimer)
+            commitTimer = null
+            uncommitted = false
             this.$wire.$commit()
+        },
+
+        loadContent(value) {
+            const strict = config.format === 'json'
+            const content = this.contentFor(value)
+            let loaded = false
+
+            this.unreadable = false
+            pendingSync = false
+
+            try {
+                loaded = instance.commands.setContent(content, { emitUpdate: false, errorOnInvalidContent: strict })
+            } catch {
+                loaded = false
+            }
+
+            if (!loaded || this.unreadable) {
+                this.unreadable = true
+                instance.commands.setContent(content, { emitUpdate: false, errorOnInvalidContent: false })
+            }
+
+            instance.setEditable(!this.unreadable, false)
+            this.syncAttributes()
         },
 
         destroy() {
@@ -298,7 +350,7 @@ export default function editor(config) {
             }
 
             try {
-                const incoming = createDocument(this.contentFor(value), instance.schema, instance.options.parseOptions)
+                const incoming = createDocument(this.contentFor(value), instance.schema, instance.options.parseOptions, { errorOnInvalidContent: config.format === 'json' })
 
                 return incoming.eq(instance.state.doc)
             } catch {

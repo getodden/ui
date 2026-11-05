@@ -59,6 +59,14 @@ class RecordTableComponent extends Component
         return $query->toRawSql();
     }
 
+    public function groupedSql(): string
+    {
+        $query = Fruit::query()->select('colour')->groupBy('colour');
+        $this->applyRecordTable($query);
+
+        return $query->toRawSql();
+    }
+
     public function updatedSearch(): void
     {
         $this->searchUpdates++;

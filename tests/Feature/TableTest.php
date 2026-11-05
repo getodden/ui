@@ -189,3 +189,14 @@ it('scopes the busy state, spinner and loading message to the table state', func
         ->and(array_unique($targets))->toHaveCount(1)
         ->and(explode(',', $targets[0]))->toContain('sortBy', 'search', 'filters', 'perPage', 'gotoPage', 'nextPage', 'previousPage', 'setPage', 'resetFilters');
 });
+
+it('escapes a hostile page name in the pagination handlers', function (): void {
+    $name = "p');alert(1);('";
+    $records = paginatorOf(42, 10, 2)->setPageName($name);
+    $dom = Html::render('<x-ui::table caption="Fruit" :columns="$columns" :records="$records"><tr><td>x</td></tr></x-ui::table>', ['columns' => TABLE_COLUMNS, 'records' => $records]);
+
+    $handlers = array_map(fn ($button): string => $button->getAttribute('wire:click'), iterator_to_array($dom->querySelectorAll('nav button[wire\:click]')));
+
+    expect($handlers)->not->toBe([])
+        ->and($handlers[0])->toBe('previousPage('.Js::from($name)->toHtml().')');
+});

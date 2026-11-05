@@ -6,11 +6,9 @@ use Dom\HTMLDocument;
 use Odden\Ui\Support\RichHtml;
 use Workbench\App\Livewire\EditorDemo;
 
-dataset('parsers', ['html5' => [false], 'legacy' => [true]]);
-
-function cleanWith(bool $legacy, string $html): string
+function cleanWith(string $html): string
 {
-    return $legacy ? RichHtml::cleanWithLegacyParser($html) : RichHtml::clean($html);
+    return RichHtml::clean($html);
 }
 
 dataset('payloads', [
@@ -114,8 +112,11 @@ function assertSafe(string $clean): void
         }
 
         if ($name === 'a') {
-            expect($element->getAttribute('rel'))->toBe('noopener noreferrer nofollow')
-                ->and($element->getAttribute('href'))->toMatch('/^((https?|mailto|tel):|\/(?![\/\\\\])|#|\?)/i');
+            expect($element->getAttribute('href'))->toMatch('/^((https?|mailto|tel):|\/(?![\/\\\\])|#|\?)/i');
+
+            if ($element->hasAttribute('rel')) {
+                expect(array_diff(explode(' ', $element->getAttribute('rel')), ['noopener', 'noreferrer', 'nofollow', 'ugc', 'sponsored']))->toBe([]);
+            }
 
             if ($element->hasAttribute('target')) {
                 expect($element->getAttribute('target'))->toBe('_blank');
@@ -126,23 +127,23 @@ function assertSafe(string $clean): void
     expect($clean)->not->toMatch('/<script/i');
 }
 
-it('leaves nothing executable from an attack payload', function (string $payload, bool $legacy): void {
-    assertSafe(cleanWith($legacy, $payload));
-})->with('payloads', 'parsers');
+it('leaves nothing executable from an attack payload', function (string $payload): void {
+    assertSafe(cleanWith($payload));
+})->with('payloads');
 
-it('settles on a fixed point for every payload', function (string $payload, bool $legacy): void {
-    $clean = cleanWith($legacy, $payload);
+it('settles on a fixed point for every payload', function (string $payload): void {
+    $clean = cleanWith($payload);
 
-    expect(cleanWith($legacy, $clean))->toBe($clean);
-})->with('payloads', 'parsers');
+    expect(cleanWith($clean))->toBe($clean);
+})->with('payloads');
 
-it('keeps the text around dropped markup but not the text of script-like elements', function (bool $legacy): void {
-    expect(cleanWith($legacy, '<div>keep <script>alert(1)</script>this <b>bold</b> <style>p{}</style>text</div>'))->toBe('keep this <strong>bold</strong> text')
-        ->and(cleanWith($legacy, '<table><tr><td>cell</td></tr></table>'))->toBe('cell');
-})->with('parsers');
+it('keeps the text around dropped markup but not the text of script-like elements', function (): void {
+    expect(cleanWith('<div>keep <script>alert(1)</script>this <b>bold</b> <style>p{}</style>text</div>'))->toBe('keep this <strong>bold</strong> text')
+        ->and(cleanWith('<table><tr><td>cell</td></tr></table>'))->toBe('cell');
+});
 
-it('drops the contents of dangerous containers', function (string $html, bool $legacy): void {
-    expect(cleanWith($legacy, "<p>a</p>{$html}<p>b</p>"))->toBe('<p>a</p><p>b</p>');
+it('drops the contents of dangerous containers', function (string $html): void {
+    expect(cleanWith("<p>a</p>{$html}<p>b</p>"))->toBe('<p>a</p><p>b</p>');
 })->with([
     'svg' => '<svg><text>secret</text></svg>',
     'math' => '<math><mi>secret</mi></math>',
@@ -153,15 +154,15 @@ it('drops the contents of dangerous containers', function (string $html, bool $l
     'textarea' => '<textarea>secret</textarea>',
     'title' => '<title>secret</title>',
     'style' => '<style>secret</style>',
-])->with('parsers');
+]);
 
-it('keeps Filament-shaped content unchanged', function (string $html, bool $legacy): void {
-    expect(cleanWith($legacy, $html))->toBe($html);
+it('keeps Filament-shaped content unchanged', function (string $html): void {
+    expect(cleanWith($html))->toBe($html);
 })->with([
     'paragraph with marks' => '<p>Plain <strong>bold</strong> <em>italic</em> <u>under</u> <s>struck</s> <code>code</code></p>',
     'mention' => '<p>Hi <span data-type="mention" data-id="7" data-label="Ada Lovelace" data-char="@">@Ada Lovelace</span> there</p>',
     'link' => '<p>Read <a target="_blank" rel="noopener noreferrer nofollow" href="https://example.com/docs?a=1&amp;b=2">the docs</a></p>',
-    'mailto and tel' => '<p><a rel="noopener noreferrer nofollow" href="mailto:ada@example.com">mail</a> <a rel="noopener noreferrer nofollow" href="tel:+15550100">call</a></p>',
+    'mailto and tel' => '<p><a href="mailto:ada@example.com">mail</a> <a href="tel:+15550100">call</a></p>',
     'headings' => '<h2>Two</h2><h3>Three</h3><h4>Four</h4>',
     'bullet list' => '<ul><li><p>One</p></li><li><p>Two</p><ul><li><p>Nested</p></li></ul></li></ul>',
     'ordered list with start' => '<ol start="3"><li><p>Three</p></li><li><p>Four</p></li></ol>',
@@ -172,41 +173,44 @@ it('keeps Filament-shaped content unchanged', function (string $html, bool $lega
     'hard break' => '<p>one<br>two</p>',
     'escaped text' => '<p>1 &lt; 2 &amp; 3 &gt; 2 and "quotes" and \'single\'</p>',
     'unicode' => '<p>Zoë — 日本語 😀</p>',
-])->with('parsers');
+]);
 
-it('writes the canonical form of equivalent markup', function (string $html, string $expected, bool $legacy): void {
-    expect(cleanWith($legacy, $html))->toBe($expected);
+it('writes the canonical form of equivalent markup', function (string $html, string $expected): void {
+    expect(cleanWith($html))->toBe($expected);
 })->with([
     'b i strike' => ['<p><b>a</b><i>b</i><strike>c</strike></p>', '<p><strong>a</strong><em>b</em><s>c</s></p>'],
     'uppercase tags' => ['<P><STRONG>a</STRONG></P>', '<p><strong>a</strong></p>'],
-    'link without target gets rel' => ['<a href="https://example.com">x</a>', '<a rel="noopener noreferrer nofollow" href="https://example.com">x</a>'],
-    'link target other than blank is dropped' => ['<a href="https://example.com" target="_top" rel="opener">x</a>', '<a rel="noopener noreferrer nofollow" href="https://example.com">x</a>'],
-    'uppercase scheme' => ['<a href="HTTPS://Example.com/A">x</a>', '<a rel="noopener noreferrer nofollow" href="HTTPS://Example.com/A">x</a>'],
-    'padded href' => ['<a href="  https://example.com  ">x</a>', '<a rel="noopener noreferrer nofollow" href="https://example.com">x</a>'],
+    'link without target stays plain' => ['<a href="https://example.com">x</a>', '<a href="https://example.com">x</a>'],
+    'link target other than blank and unknown rel tokens are dropped' => ['<a href="https://example.com" target="_top" rel="opener">x</a>', '<a href="https://example.com">x</a>'],
+    'uppercase scheme' => ['<a href="HTTPS://Example.com/A">x</a>', '<a href="HTTPS://Example.com/A">x</a>'],
+    'padded href' => ['<a href="  https://example.com  ">x</a>', '<a href="https://example.com">x</a>'],
     'unsafe link keeps its text' => ['<p><a href="javascript:alert(1)">click</a></p>', '<p>click</p>'],
-    'relative link is kept' => ['<a href="/x">click</a>', '<a rel="noopener noreferrer nofollow" href="/x">click</a>'],
+    'relative link is kept' => ['<a href="/x">click</a>', '<a href="/x">click</a>'],
     'bare relative link keeps its text' => ['<a href="x">click</a>', 'click'],
     'ordered list start one' => ['<ol start="1"><li>a</li></ol>', '<ol><li>a</li></ol>'],
     'ordered list bad start' => ['<ol start="x"><li>a</li></ol>', '<ol><li>a</li></ol>'],
     'other span' => ['<p><span class="x">a</span></p>', '<p>a</p>'],
     'mention keeps only its data attributes' => ['<span data-type="mention" class="x" data-id="1" data-label="A" data-char="#" title="t">#A</span>', '<span data-type="mention" data-id="1" data-label="A" data-char="#">#A</span>'],
-    'mention label is escaped' => ['<span data-type="mention" data-id="1" data-label="&quot; x=&quot;">@x</span>', '<span data-type="mention" data-id="1" data-label="&quot; x=&quot;">@x</span>'],
+    'mention label is escaped and the char defaults' => ['<span data-type="mention" data-id="1" data-label="&quot; x=&quot;">@x</span>', '<span data-type="mention" data-id="1" data-label="&quot; x=&quot;" data-char="@">@x</span>'],
+    'marks inside inline code are dropped' => ['<p><code><strong>a</strong> <a href="https://example.com">b</a></code></p>', '<p><code>a b</code></p>'],
+    'script inside inline code is dropped' => ['<p><code>a<script>b</script></code></p>', '<p><code>a</code></p>'],
+    'link target and rel are kept when safe' => ['<a href="https://example.com" target="_BLANK" rel="NoOpener evil noreferrer">x</a>', '<a target="_blank" rel="noopener noreferrer" href="https://example.com">x</a>'],
     'empty' => ['', ''],
     'whitespace only' => ["  \n ", ''],
     'comments only' => ['<!-- x -->', ''],
     'script only' => ['<script>x</script>', ''],
-])->with('parsers');
+]);
 
-it('replaces invalid UTF-8 instead of failing', function (bool $legacy): void {
-    $clean = cleanWith($legacy, "<p>ok \xC3\x28 end</p>");
+it('replaces invalid UTF-8 instead of failing', function (): void {
+    $clean = cleanWith("<p>ok \xC3\x28 end</p>");
 
     expect(mb_check_encoding($clean, 'UTF-8'))->toBeTrue()
         ->and($clean)->toStartWith('<p>ok ')
         ->and($clean)->toEndWith(' end</p>');
-})->with('parsers');
+});
 
-it('agrees between the HTML5 parser and the legacy parser on editor output', function (string $html): void {
-    expect(RichHtml::clean($html))->toBe(RichHtml::cleanWithLegacyParser($html));
+it('leaves editor output unchanged', function (string $html): void {
+    expect(RichHtml::clean($html))->toBe($html);
 })->with([
     '<p>Hello <strong>world</strong></p><ul><li><p>a</p></li></ul>',
     '<p>x <span data-type="mention" data-id="7" data-label="Ada" data-char="@">@Ada</span></p>',
@@ -235,7 +239,7 @@ it('stays stable on random tag soup', function (): void {
 it('refuses input over the byte limit and over the tag limit', function (): void {
     expect(fn () => RichHtml::clean(str_repeat('a', RichHtml::MAXIMUM_BYTES + 1)))->toThrow(LengthException::class)
         ->and(fn () => RichHtml::clean(str_repeat('<b>', RichHtml::MAXIMUM_TAGS + 1)))->toThrow(LengthException::class)
-        ->and(fn () => RichHtml::cleanWithLegacyParser(str_repeat('<b>', RichHtml::MAXIMUM_TAGS + 1)))->toThrow(LengthException::class)
+        ->and(fn () => RichHtml::clean(str_repeat('</b>', RichHtml::MAXIMUM_TAGS * 2 + 1)))->toThrow(LengthException::class)
         ->and(RichHtml::clean(str_repeat('a', RichHtml::MAXIMUM_BYTES)))->toBeString();
 });
 
@@ -248,10 +252,10 @@ it('cleans input at the tag limit quickly', function (): void {
         ->and($clean)->toBeString();
 });
 
-it('keeps relative hrefs that stay on the site and refuses protocol-relative ones', function (string $href, ?string $kept, bool $legacy): void {
-    $expected = $kept === null ? 'x' : '<a rel="noopener noreferrer nofollow" href="'.$kept.'">x</a>';
+it('keeps relative hrefs that stay on the site and refuses protocol-relative ones', function (string $href, ?string $kept): void {
+    $expected = $kept === null ? 'x' : '<a href="'.$kept.'">x</a>';
 
-    expect(cleanWith($legacy, '<a href="'.$href.'">x</a>'))->toBe($expected);
+    expect(cleanWith('<a href="'.$href.'">x</a>'))->toBe($expected);
 })->with([
     'path' => ['/docs/a?b=1', '/docs/a?b=1'],
     'fragment' => ['#section', '#section'],
@@ -260,30 +264,86 @@ it('keeps relative hrefs that stay on the site and refuses protocol-relative one
     'backslash host' => ['/\\evil.example', null],
     'tab host' => ['/&#9;/evil.example', null],
     'bare word' => ['docs/a', null],
-])->with('parsers');
+]);
 
-it('keeps what Filament stores that the editor can show', function (string $html, bool $legacy): void {
-    expect(cleanWith($legacy, $html))->toBe($html);
+it('keeps what Filament stores that the editor can show', function (string $html): void {
+    expect(cleanWith($html))->toBe($html);
 })->with([
     'h1' => '<h1>One</h1>',
     'code language' => '<pre><code class="language-php">echo 1;</code></pre>',
     'ordered list type' => '<ol start="3" type="a"><li><p>c</p></li></ol>',
     'ordered list type only' => '<ol type="I"><li><p>c</p></li></ol>',
     'non-breaking space' => '<p>a&nbsp;b</p>',
-])->with('parsers');
+]);
 
-it('drops what does not belong in a code element or an ordered list', function (string $html, string $expected, bool $legacy): void {
-    expect(cleanWith($legacy, $html))->toBe($expected);
+it('drops what does not belong in a code element or an ordered list', function (string $html, string $expected): void {
+    expect(cleanWith($html))->toBe($expected);
 })->with([
     'language class outside pre' => ['<p><code class="language-php">x</code></p>', '<p><code>x</code></p>'],
     'other classes' => ['<pre><code class="evil language-js hljs">x</code></pre>', '<pre><code class="language-js">x</code></pre>'],
     'bad language' => ['<pre><code class="language-a&quot;b">x</code></pre>', '<pre><code>x</code></pre>'],
     'bad list type' => ['<ol type="z"><li>a</li></ol>', '<ol><li>a</li></ol>'],
     'del' => ['<p><del>gone</del></p>', '<p><s>gone</s></p>'],
-])->with('parsers');
+]);
 
-it('leaves Filament-shaped HTML unchanged', function (bool $legacy): void {
+it('leaves Filament-shaped HTML unchanged', function (): void {
     $html = (new EditorDemo)->filament;
 
-    expect(cleanWith($legacy, $html))->toBe($html);
-})->with('parsers');
+    expect(cleanWith($html))->toBe($html);
+});
+
+function measure(string $html): array
+{
+    memory_reset_peak_usage();
+    $before = memory_get_peak_usage();
+    $started = microtime(true);
+
+    try {
+        $clean = RichHtml::clean($html);
+    } catch (LengthException) {
+        $clean = null;
+    }
+
+    return ['seconds' => microtime(true) - $started, 'megabytes' => (memory_get_peak_usage() - $before) / 1048576, 'clean' => $clean];
+}
+
+dataset('worst cases', [
+    'formatting elements with distinct attributes' => fn () => '<p>'.implode('', array_map(fn (int $i): string => "<b a={$i}>", range(1, 3000))).str_repeat('</p><p>x', 3000),
+    'distinct code classes' => fn () => '<pre>'.implode('', array_map(fn (int $i): string => "<code class=\"language-l{$i}\">", range(1, 1500))).str_repeat('</pre><pre>x', 1500),
+    'many attributes in one tag' => fn () => '<p '.implode(' ', array_map(fn (int $i): string => "a{$i}=1", range(1, 30000))).'>x</p>',
+    'boolean attributes up to the byte limit' => fn () => '<p '.implode(' ', array_map(fn (int $i): string => base_convert((string) ($i + 1296), 10, 36), range(1, 60000))).'>x</p>',
+    'quoted attributes holding angle brackets' => fn () => '<p '.str_repeat('a="x>y" ', 30000).'>x</p>',
+    'unterminated tags' => fn () => str_repeat('<p ', RichHtml::MAXIMUM_TAGS - 1),
+    'unterminated comments' => fn () => str_repeat('<!--', RichHtml::MAXIMUM_TAGS - 1),
+    'a long comment' => fn () => '<!--'.str_repeat('a', 100000).'-->',
+    'nested paragraphs' => fn () => str_repeat('<p>', RichHtml::MAXIMUM_TAGS - 10),
+    'nested bold and paragraphs' => fn () => str_repeat('<b><p>', 4990),
+    'nested lists' => fn () => str_repeat('<ul><li>', 4990),
+    'nested tables with bold' => fn () => str_repeat('<table><b>', 4990),
+    'adoption agency stress' => fn () => str_repeat('<a><b><i><s>', 2490),
+    'many comments' => fn () => str_repeat('<!---->', RichHtml::MAXIMUM_TAGS - 1),
+    'many entities' => fn () => str_repeat('&amp;', intdiv(RichHtml::MAXIMUM_BYTES, 5)),
+    'a huge text' => fn () => str_repeat('a', RichHtml::MAXIMUM_BYTES),
+    'many mentions' => fn () => str_repeat('<span data-type="mention" data-id="1" data-label="x">@x</span>', 3000),
+]);
+
+it('cleans the worst input within the limits fast and in little memory', function (Closure $payload): void {
+    $result = measure($payload());
+
+    expect($result['seconds'])->toBeLessThan(0.25)
+        ->and($result['megabytes'])->toBeLessThan(64);
+
+    if ($result['clean'] !== null) {
+        expect(RichHtml::clean($result['clean']))->toBe($result['clean']);
+    }
+})->with('worst cases');
+
+it('refuses a tag longer than the tag limit', function (): void {
+    expect(fn () => RichHtml::clean('<p title="'.str_repeat('a', RichHtml::MAXIMUM_TAG_BYTES).'">x</p>'))->toThrow(LengthException::class)
+        ->and(RichHtml::clean('<p title="'.str_repeat('a', 1000).'">x</p>'))->toBe('<p>x</p>');
+});
+
+it('keeps content after a closing body or html tag', function (): void {
+    expect(RichHtml::clean('<p>a</p></body></html><p>b</p>'))->toBe('<p>a</p><p>b</p>')
+        ->and(RichHtml::clean('<html><body onload="x"><p>a</p></body></html>'))->toBe('<p>a</p>');
+});

@@ -140,7 +140,7 @@ it('adds a link through the inline form and refuses an unsafe address', function
 
     $page->keys(':focus', ['ControlOrMeta+a', 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'o', 'r', 'g'])
         ->click('#editor-body [data-link-apply]')
-        ->assertSeeIn('#saved-body', '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.org">x</a></p>')
+        ->assertSeeIn('#saved-body', '<p><a href="https://example.org">x</a></p>')
         ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-expanded") === "false"')
         ->assertScript('!document.querySelector("#editor-body [data-tool=link]").hasAttribute("aria-pressed")');
 });
@@ -235,9 +235,9 @@ it('does not execute or render stored script, handler or javascript: content', f
 
     $page->assertNoJavaScriptErrors();
 
-    $result = $page->script(editorSettled('{ xss: window.__xss === true, img: document.querySelectorAll("#editor-untrusted img").length, script: document.querySelectorAll("#editor-untrusted script").length, javascript: document.querySelectorAll("#editor-untrusted a[href^=javascript]").length, anchors: document.querySelectorAll("#editor-untrusted a").length, text: document.querySelector("#editor-untrusted [role=textbox]").textContent }'));
+    $result = $page->script(editorSettled('{ xss: window.__xss === true, img: document.querySelectorAll("#editor-untrusted img").length, script: document.querySelectorAll("#editor-untrusted script").length, javascript: document.querySelectorAll("#editor-untrusted a[href^=javascript]").length, anchors: document.querySelectorAll("#editor-untrusted a").length, text: document.querySelector("#editor-untrusted [role=textbox]").textContent, editable: document.querySelector("#editor-untrusted [role=textbox]").getAttribute("contenteditable"), notice: getComputedStyle(document.querySelector("#ui-untrusted-unreadable")).display }'));
 
-    expect($result)->toBe(['xss' => false, 'img' => 0, 'script' => 0, 'javascript' => 0, 'anchors' => 0, 'text' => 'Safe textbad link']);
+    expect($result)->toBe(['xss' => false, 'img' => 0, 'script' => 0, 'javascript' => 0, 'anchors' => 0, 'text' => 'Safe textbad link', 'editable' => 'true', 'notice' => 'none']);
 });
 
 it('has no accessibility issues', function (): void {
@@ -355,4 +355,78 @@ it('names heading buttons by their visible text and exposes the link button as a
         ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-controls") === "ui-body-link"')
         ->click('#editor-body [data-tool=link]')
         ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-expanded") === "true"');
+});
+
+function callServer($page, string $method): void
+{
+    $page->script('Livewire.find(document.querySelector("#editor-body").closest("[wire\\\\:id]").getAttribute("wire:id")).'.$method.'()');
+}
+
+function countUpdates($page): void
+{
+    $page->script('window.updates = 0; const original = window.fetch; window.fetch = (...arguments_) => { if (String(arguments_[0]).includes("livewire")) { window.updates++ } return original(...arguments_) }');
+}
+
+it('shows the notice and refuses edits when the server pushes content the editor cannot show', function (string $wrapper, string $method, string $saved, string $prefix): void {
+    $page = visit('/');
+    $editable = $wrapper.' [role=textbox]';
+
+    callServer($page, $method);
+    $page->assertSeeIn($saved, '"type":"image"');
+
+    $page->assertScript('getComputedStyle(document.querySelector("'.$wrapper.' [id$=-unreadable]")).display !== "none"')
+        ->assertScript('document.querySelector("'.$editable.'").getAttribute("contenteditable") === "false"')
+        ->assertScript('document.querySelector("'.$editable.'").getAttribute("aria-describedby").includes("-unreadable")');
+
+    $before = $page->script(savedText($saved));
+
+    countUpdates($page);
+    $page->keys($editable, ['x', 'y']);
+
+    expect($page->script(editorSettled(savedText($saved))))->toBe($before)
+        ->and($page->script('window.updates'))->toBe(0);
+})->with([
+    'an editor that held valid content' => ['#editor-json', 'setMentionDocToImage', '#saved-json', 'ui-mentionDoc'],
+    'an empty editor' => ['#editor-emptydoc', 'setEmptyDocToImage', '#saved-emptydoc', 'ui-emptyDoc'],
+]);
+
+it('sends one request for one server push', function (): void {
+    $page = visit('/');
+
+    countUpdates($page);
+    $page->click('#set-body')->assertSeeIn('#saved-body', 'From the server');
+
+    expect($page->script(editorSettled('window.updates')))->toBe(1);
+});
+
+it('keeps a blur editor local until something else sends a request', function (): void {
+    $page = visit('/');
+
+    countUpdates($page);
+    $page->click('#editor-blur [role=textbox]')->keys('#editor-blur [role=textbox]', ['a', 'b']);
+
+    expect($page->script(editorSettled(savedText('#saved-blur'))))->toBe('');
+
+    $page->click('#editor-body [role=textbox]');
+
+    expect($page->script('window.updates'))->toBe(0);
+
+    $page->click('#set-body')->assertSeeIn('#saved-blur', '<p>ab</p>');
+});
+
+it('sends a live blur editor once, on blur, and only when it changed', function (): void {
+    $page = visit('/');
+    $editable = '#editor-liveblur [role=textbox]';
+
+    countUpdates($page);
+    $page->click($editable)->keys($editable, ['a', 'b']);
+
+    expect($page->script(editorSettled(savedText('#saved-liveblur'))))->toBe('')
+        ->and($page->script('window.updates'))->toBe(0);
+
+    $page->click('#editor-body [role=textbox]')->assertSeeIn('#saved-liveblur', '<p>ab</p>');
+
+    $page->click($editable)->click('#editor-body [role=textbox]');
+
+    expect($page->script(editorSettled('window.updates')))->toBe(1);
 });

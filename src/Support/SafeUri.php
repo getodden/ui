@@ -28,4 +28,14 @@ final class SafeUri
 
         return in_array(strtolower($matches[1]), self::ALLOWED_PROTOCOLS, true) ? $uri : null;
     }
+
+    public static function rel(string $rel): ?string
+    {
+        $tokens = array_values(array_unique(array_filter(
+            preg_split('/\s+/', strtolower(trim($rel))) ?: [],
+            fn (string $token): bool => in_array($token, ['noopener', 'noreferrer', 'nofollow', 'ugc', 'sponsored'], true),
+        )));
+
+        return $tokens === [] ? null : implode(' ', $tokens);
+    }
 }

@@ -35,6 +35,11 @@ final class RichJson
     public static function clean(array $document): array
     {
         $cleaner = new self;
+
+        if (array_is_list($document) && $document !== []) {
+            $document = ['type' => 'doc', 'content' => $document];
+        }
+
         $children = $cleaner->node($document, 0);
 
         if (count($children) === 1 && ($children[0]['type'] ?? null) === 'doc') {
@@ -64,8 +69,9 @@ final class RichJson
             $type === 'text' => $this->text($node),
             $type === 'hardBreak' || $type === 'horizontalRule' => [['type' => $type]],
             $type === 'mention' => $this->mention($node),
-            in_array($type, ['doc', ...self::BLOCKS], true) => $this->container($type, $node, $depth),
-            default => $this->descendantText($node, $depth),
+            $type === 'doc' && $depth === 0 => $this->container($type, $node, $depth),
+            in_array($type, self::BLOCKS, true) => $this->container($type, $node, $depth),
+            default => $this->children($node, $depth),
         };
     }
 
@@ -120,7 +126,7 @@ final class RichJson
             }
         }
 
-        return array_values($clean);
+        return isset($clean['code']) ? [['type' => 'code']] : array_values($clean);
     }
 
     /**
@@ -141,7 +147,7 @@ final class RichJson
             'attrs' => [
                 'href' => $href,
                 'target' => ($attributes['target'] ?? null) === '_blank' ? '_blank' : null,
-                'rel' => 'noopener noreferrer nofollow',
+                'rel' => is_string($attributes['rel'] ?? null) ? SafeUri::rel($attributes['rel']) : null,
                 'class' => null,
             ],
         ];
@@ -189,8 +195,16 @@ final class RichJson
             $children = $this->inlineOnly($children, $type);
         } elseif (in_array($type, self::LISTS, true)) {
             $children = $this->listItems($children);
+
+            if ($children === []) {
+                return [];
+            }
         } elseif (in_array($type, self::CONTAINERS, true)) {
             $children = $this->blocks($children);
+
+            if ($type === 'listItem' && ($children[0]['type'] ?? null) !== 'paragraph') {
+                array_unshift($children, ['type' => 'paragraph']);
+            }
         }
 
         $clean = ['type' => $type];
@@ -260,15 +274,6 @@ final class RichJson
         }
 
         return $children;
-    }
-
-    /**
-     * @param  array<mixed>  $node
-     * @return list<array<string, mixed>>
-     */
-    private function descendantText(array $node, int $depth): array
-    {
-        return $this->flatten($this->children($node, $depth));
     }
 
     /**
@@ -343,6 +348,12 @@ final class RichJson
             if ($run !== []) {
                 $blocks[] = ['type' => 'paragraph', 'content' => $run];
                 $run = [];
+            }
+
+            if (($node['type'] ?? null) === 'listItem') {
+                array_push($blocks, ...(is_array($node['content'] ?? null) ? array_values($node['content']) : []));
+
+                continue;
             }
 
             $blocks[] = $node;

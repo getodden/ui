@@ -36,6 +36,21 @@
     </div>
     <pre id="saved-unreadable">{{ json_encode($unreadableDoc) }}</pre>
 
+    <div id="editor-emptydoc">
+        <x-ui::editor label="Empty document" wire:model.live="emptyDoc" format="json" />
+    </div>
+    <pre id="saved-emptydoc">{{ json_encode($emptyDoc) }}</pre>
+
+    <div id="editor-blur">
+        <x-ui::editor label="On blur" wire:model.blur="blurBody" :toolbar="[]" />
+    </div>
+    <pre id="saved-blur">{{ $blurBody }}</pre>
+
+    <div id="editor-liveblur">
+        <x-ui::editor label="Live on blur" wire:model.live.blur="liveBlurBody" :toolbar="[]" />
+    </div>
+    <pre id="saved-liveblur">{{ $liveBlurBody }}</pre>
+
     <div id="editor-linkdoc">
         <x-ui::editor label="Link document" wire:model.live="linkDoc" format="json" />
     </div>

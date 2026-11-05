@@ -222,9 +222,29 @@ trait WithRecordTable
             $this->orderUsing($query, $this->sortableColumns()[$sort], $this->activeDirection());
         }
 
-        if ($query instanceof EloquentBuilder) {
-            $query->orderBy($query->getModel()->getQualifiedKeyName());
+        $tiebreak = $this->tiebreakColumn($query);
+
+        if ($tiebreak !== null) {
+            $query->orderBy($tiebreak);
         }
+    }
+
+    /**
+     * @param  EloquentBuilder<*>|QueryBuilder  $query
+     */
+    protected function tiebreakColumn(EloquentBuilder|QueryBuilder $query): ?string
+    {
+        if (! $query instanceof EloquentBuilder) {
+            return null;
+        }
+
+        $base = $query->getQuery();
+
+        if (($base->groups ?? []) !== [] || ($base->distinct !== false)) {
+            return null;
+        }
+
+        return $query->getModel()->getQualifiedKeyName();
     }
 
     /**
@@ -261,7 +281,35 @@ trait WithRecordTable
 
     private function scalarState(mixed $value): string
     {
-        return is_string($value) || is_int($value) || is_float($value) ? (string) $value : '';
+        return is_string($value) ? mb_scrub($value) : (is_int($value) || is_float($value) ? (string) $value : '');
+    }
+
+    private function scrubbedState(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return mb_scrub($value);
+        }
+
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $scrubbed = [];
+
+        foreach ($value as $key => $item) {
+            $scrubbed[is_string($key) ? mb_scrub($key) : $key] = $this->scrubbedState($item);
+        }
+
+        return $scrubbed;
+    }
+
+    public function dehydrateWithRecordTable(): void
+    {
+        $this->search = $this->scrubbedState($this->search);
+        $this->sort = $this->scrubbedState($this->sort);
+        $this->direction = $this->scrubbedState($this->direction);
+        $this->filters = $this->scrubbedState($this->filters);
+        $this->perPage = $this->scrubbedState($this->perPage);
     }
 
     public function updatedWithRecordTable(string $name): void

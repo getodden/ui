@@ -53,7 +53,7 @@ it('drops unsafe link marks but keeps their text', function (string $href): void
 it('fixes the link attributes', function (): void {
     $clean = RichJson::clean(paragraph(['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'link', 'attrs' => ['href' => 'https://example.com', 'target' => 'javascript:x', 'rel' => 'opener', 'class' => 'evil', 'onclick' => 'x']]]]));
 
-    expect($clean['content'][0]['content'][0]['marks'][0]['attrs'])->toBe(['href' => 'https://example.com', 'target' => null, 'rel' => 'noopener noreferrer nofollow', 'class' => null]);
+    expect($clean['content'][0]['content'][0]['marks'][0]['attrs'])->toBe(['href' => 'https://example.com', 'target' => null, 'rel' => null, 'class' => null]);
 });
 
 it('replaces unknown nodes by their text and drops unknown marks and attributes', function (): void {
@@ -120,3 +120,46 @@ it('settles on a fixed point', function (): void {
 
     expect(RichJson::clean($clean))->toBe($clean);
 });
+
+it('keeps the rel tokens that are safe and nothing else', function (): void {
+    $clean = RichJson::clean(paragraph(['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'link', 'attrs' => ['href' => 'https://example.com', 'target' => '_blank', 'rel' => 'noopener evil NoReferrer']]]]));
+
+    expect($clean['content'][0]['content'][0]['marks'][0]['attrs'])->toBe(['href' => 'https://example.com', 'target' => '_blank', 'rel' => 'noopener noreferrer', 'class' => null]);
+});
+
+it('shapes documents the editor schema accepts', function (array $node, array $expected): void {
+    expect(RichJson::clean(['type' => 'doc', 'content' => [$node]])['content'])->toBe($expected);
+})->with([
+    'a nested doc is a wrapper' => [['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'in']]]]], [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'in']]]]],
+    'a list item starts with a paragraph' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph']]]]]]]]], [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph'], ['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph']]]]]]]]]]],
+    'empty lists are dropped' => [['type' => 'bulletList', 'content' => []], [['type' => 'paragraph']]],
+    'a list item outside a list is unwrapped' => [['type' => 'listItem', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]], [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]],
+    'code excludes the other marks' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'bold'], ['type' => 'code'], ['type' => 'link', 'attrs' => ['href' => 'https://example.com']]]]]], [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'code']]]]]]],
+    'paragraphs in an unknown wrapper stay separate' => [['type' => 'wrapper', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'inner']]], ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'li']]]]], [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'inner']]], ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'li']]]]],
+]);
+
+it('treats a top-level list of nodes as the content of the document', function (): void {
+    expect(RichJson::clean([['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]))->toBe(['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]]);
+});
+
+it('produces documents the editor schema accepts for every hostile document', function (): void {
+    $documents = [
+        ['type' => 'doc', 'content' => [['type' => 'doc', 'content' => [['type' => 'text', 'text' => 'a']]], ['type' => 'listItem'], ['type' => 'bulletList'], ['type' => 'orderedList', 'content' => [['type' => 'paragraph']]]]],
+        ['type' => 'doc', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'heading', 'attrs' => ['level' => 2], 'content' => [['type' => 'text', 'text' => 'h']]]]]]]]],
+        ['type' => 'doc', 'content' => [['type' => 'table', 'content' => [['type' => 'tableRow', 'content' => [['type' => 'tableCell', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'c']]]]]]]]], ['type' => 'image'], ['type' => 'text', 'text' => 'loose', 'marks' => [['type' => 'bold'], ['type' => 'code']]]]],
+        ['type' => 'doc', 'content' => [['type' => 'codeBlock', 'content' => [['type' => 'text', 'text' => 'x', 'marks' => [['type' => 'bold']]], ['type' => 'hardBreak'], ['type' => 'mention', 'attrs' => ['id' => 1, 'label' => 'A']]]]]],
+        ['type' => 'doc', 'content' => [['type' => 'blockquote', 'content' => [['type' => 'text', 'text' => 'a'], ['type' => 'blockquote']]], ['type' => 'paragraph', 'content' => [['type' => 'blockquote', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'q']]]]], ['type' => 'hardBreak']]]]],
+        ['type' => 'doc', 'content' => [['type' => 'orderedList', 'attrs' => ['start' => 4, 'type' => 'i'], 'content' => [['type' => 'text', 'text' => 'a'], ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'b']]]]]]],
+        ['type' => 'doc'],
+        [],
+        [['type' => 'text', 'text' => 'x']],
+    ];
+
+    $path = tempnam(sys_get_temp_dir(), 'rich-json');
+    file_put_contents($path, json_encode(array_map(fn (array $document): array => RichJson::clean($document), $documents)));
+
+    $output = shell_exec('node '.escapeshellarg(dirname(__DIR__).'/Support/EditorSchemaCheck.mjs').' '.escapeshellarg($path).' 2>&1');
+    unlink($path);
+
+    expect(trim((string) $output))->toBe('ok '.count($documents));
+})->skip(fn (): bool => ! is_dir(dirname(__DIR__, 2).'/node_modules/@tiptap/core'));

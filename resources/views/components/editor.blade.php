@@ -23,19 +23,25 @@
     $modelKey = array_key_first($modelAttributes);
     $modelProperty = $modelKey === null ? null : $modelAttributes[$modelKey];
     $modelModifiers = $modelKey === null ? [] : array_slice(explode('.', $modelKey), 1);
-    $live = in_array('live', $modelModifiers, true);
-    $commitOnBlur = in_array('blur', $modelModifiers, true);
-    $debounceIndex = array_search('debounce', $modelModifiers, true);
-    $debounceValue = $debounceIndex === false ? null : ($modelModifiers[$debounceIndex + 1] ?? null);
+    $liveIndex = array_search('live', $modelModifiers, true);
+    $lazyWithoutLive = $liveIndex === false && in_array('lazy', $modelModifiers, true);
+    $live = $liveIndex !== false || $lazyWithoutLive;
+    $syncModifiers = $liveIndex !== false ? array_slice($modelModifiers, 0, $liveIndex) : $modelModifiers;
+    $networkModifiers = $liveIndex !== false ? array_slice($modelModifiers, $liveIndex + 1) : [];
+    $syncOnBlur = ! $lazyWithoutLive && (bool) array_intersect(['blur', 'change', 'lazy'], $syncModifiers);
+    $commitOnBlur = $lazyWithoutLive || ($live && (bool) array_intersect(['blur', 'change', 'lazy'], $networkModifiers));
+    $commitThrottled = in_array('throttle', $networkModifiers, true) && ! in_array('debounce', $networkModifiers, true);
+    $durationIndex = array_search($commitThrottled ? 'throttle' : 'debounce', $networkModifiers, true);
+    $durationValue = $durationIndex === false ? null : ($networkModifiers[$durationIndex + 1] ?? null);
     $commitDelay = 150;
 
-    if (is_string($debounceValue) && preg_match('/^(\d+(?:\.\d+)?)(ms|s)?$/', $debounceValue, $debounceMatches) === 1) {
-        $commitDelay = (int) round((float) $debounceMatches[1] * (($debounceMatches[2] ?? 'ms') === 's' ? 1000 : 1));
+    if (is_string($durationValue) && preg_match('/^(\d+(?:\.\d+)?)(ms|s)?$/', $durationValue, $durationMatches) === 1) {
+        $commitDelay = (int) round((float) $durationMatches[1] * (($durationMatches[2] ?? 'ms') === 's' ? 1000 : 1));
     }
 
     $mentionItems = $mentions === null
         ? null
-        : collect($mentions)->map(fn ($item) => $item instanceof \Illuminate\Contracts\Support\Arrayable ? $item->toArray() : $item)->values()->all();
+        : collect($mentions)->map(fn ($item): array => ['id' => data_get($item, 'id'), 'label' => data_get($item, 'label')])->values()->all();
 
     $rootAttributes = $attributes->whereDoesntStartWith('wire:model')->except(['aria-label', 'aria-labelledby', 'aria-describedby']);
 
@@ -66,7 +72,7 @@
         'mentions' => $mentionItems,
         'mentionSearch' => $mentionSearch,
         'mentionChar' => $mentionChar,
-        'commit' => ['live' => $live, 'blur' => $commitOnBlur, 'delay' => $commitDelay],
+        'commit' => ['live' => $live, 'blur' => $commitOnBlur, 'syncOnBlur' => $syncOnBlur, 'throttle' => $commitThrottled, 'delay' => $commitDelay],
         'unreadableId' => $field->id.'-unreadable',
         'linkErrorId' => $field->id.'-link-error',
         'listboxId' => $field->id.'-mentions',

@@ -166,6 +166,12 @@ it('does not mark the table busy for an unrelated action in the component', func
     expect($page->script('window.busyLog'))->toBe([]);
 });
 
+it('loads a page with invalid UTF-8 in the query string', function (): void {
+    visit('/?search=%ff&sort=%ff&filters[colour]=%ff&perPage=%ff')
+        ->assertSee('Odden UI demo')
+        ->assertSee('No fruit matches your search.');
+});
+
 it('has no accessibility issues', function (): void {
     visit('/')->assertNoAccessibilityIssues();
 });

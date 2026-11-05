@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Odden\Ui\Tests\Support\CoexistingRecordTableComponent;
+use Odden\Ui\Tests\Support\CustomTiebreakRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
 use Odden\Ui\Tests\Support\UnsortedRecordTableComponent;
@@ -339,4 +340,31 @@ it('shows a page past the end of no records as empty', function (): void {
     $component = Livewire::withQueryParams(['page' => '5'])->test(RecordTableComponent::class)->set('search', 'zzzz');
 
     expect(fruitNames($component))->toBe([])->and($component->html())->toContain('total=0');
+});
+
+it('survives invalid UTF-8 in any state property from the url', function (string $property, mixed $value): void {
+    $component = Livewire::withQueryParams([$property => $value])->test(RecordTableComponent::class);
+
+    expect(mb_check_encoding(json_encode($component->snapshot, JSON_INVALID_UTF8_SUBSTITUTE) ?: '', 'UTF-8'))->toBeTrue()
+        ->and($component->instance())->not->toBeNull();
+})->with([
+    ['search', "\xff"],
+    ['sort', "\xff"],
+    ['direction', "\xff"],
+    ['perPage', "\xff"],
+    ['filters', ["\xff" => "\xfe"]],
+    ['filters', ['colour' => "\xff"]],
+]);
+
+it('skips the key tiebreak for grouped queries', function (): void {
+    $component = Livewire::test(RecordTableComponent::class);
+
+    expect($component->instance()->groupedSql())->not->toContain('"fruits"."id"')
+        ->and($component->instance()->orderedSql())->toContain('"fruits"."id" asc');
+});
+
+it('lets the consumer choose the tiebreak column', function (): void {
+    $sql = Livewire::test(CustomTiebreakRecordTableComponent::class)->instance()->orderedSql();
+
+    expect($sql)->toContain('order by "name" asc, "name" asc');
 });
