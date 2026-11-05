@@ -41,6 +41,8 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::select>` | the field props, `options` (value => label), `placeholder`, `value`, and a slot |
 | `<x-ui::toggle>` | the field props; renders a switch |
 | `<x-ui::icon>` | `name` (for example `fas-check`), `size` sm, md, lg |
+| `<x-ui::editor>` | the field props, `format` html or json, `toolbar` (list of tools, `[]` for none), `mentions`, `mention-search`, `mention-char` |
+| `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
 
@@ -65,7 +67,78 @@ Two fields bound to the same key on one page get the same id, so give one of the
 
 The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first focusable element. The dialog is teleported to `<body>`, and the most recently opened one is always on top, so a `ui::confirm` can sit anywhere in the page. If the modal is removed from the page while open, focus returns to its opener. Escape closes only the modal that holds focus, so a modal opened from inside another closes first. A modal without a `heading` throws.
 
+### Editor
+
+A TipTap rich-text field. Its HTML, mentions included, matches Filament's RichEditor, so content stored by one opens in the other. Install the TipTap packages in your app and register the Alpine data before Alpine starts:
+
+```bash
+npm install @tiptap/core @tiptap/pm @tiptap/starter-kit @tiptap/extension-mention @tiptap/suggestion
+```
+
+```js
+import { registerEditor } from '../../vendor/getodden/ui/resources/js/editor.js'
+
+document.addEventListener('alpine:init', () => registerEditor(window.Alpine))
+```
+
+```blade
+<x-ui::editor label="Reply" wire:model="body" mention-search="searchPeople" />
+```
+
+Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, or from `mention-search`, a public method on your component that takes the query and returns that same shape. Links accept only http, https, mailto and tel.
+
+The bound value is whatever the browser sends, so treat it as untrusted. Pass it through `Odden\Ui\Support\RichHtml::clean()` before you save it or print it with `{!! !!}`. `clean()` keeps only what the editor can produce and drops everything else.
+
+### Table
+
+```blade
+<x-ui::table caption="Contacts" :columns="['name' => 'Name', 'email' => 'Email']" :state="$this->recordTableState()" :records="$contacts">
+    <x-slot:toolbar>
+        <x-ui::input type="search" label="Search" wire:model.live.debounce.250ms="search" />
+    </x-slot:toolbar>
+
+    @foreach ($contacts as $contact)
+        <tr wire:key="{{ $contact->id }}">...</tr>
+    @endforeach
+</x-ui::table>
+```
+
+Sortable headers are buttons, and the sorted column carries `aria-sort`. When there are no records, the table shows the `empty` slot. While a request runs, it is marked `aria-busy`. Pagination links appear when there is more than one page.
+
 ## Livewire traits
+
+`WithRecordTable` holds search, sort, filters, per-page and pagination state in the URL. Every key comes from your allow-lists and is checked each time it is used, so a value from the URL or `$wire.$set` that is not on a list falls back to the default.
+
+```php
+use Odden\Ui\Livewire\Concerns\WithRecordTable;
+
+class Contacts extends Component
+{
+    use WithRecordTable;
+
+    protected function sortableColumns(): array
+    {
+        return ['name' => 'name', 'created' => 'created_at'];
+    }
+
+    protected function searchableColumns(): array
+    {
+        return ['name', 'email'];
+    }
+
+    protected function recordFilters(): array
+    {
+        return ['status' => fn (Builder $query, string $value) => $query->where('status', Status::tryFrom($value) ?? Status::Active)];
+    }
+
+    public function render(): View
+    {
+        return view('contacts', ['contacts' => $this->paginateRecords(Contact::query())]);
+    }
+}
+```
+
+A filter closure receives the raw string from the request, so validate it there. Override `defaultSort()`, `defaultDirection()`, `perPageOptions()` or `applySearch()` when you need to.
 
 `WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds, and hovering or focusing the toasts holds them.
 
