@@ -230,13 +230,14 @@ it('follows Livewire 4 for what each wire:model modifier sends', function (strin
 
     expect(json_decode(str_replace(chr(92).'u0022', '"', $matches[1]), true))->toBe($expected);
 })->with([
-    'deferred' => ['', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
-    'blur is local only' => ['.blur', ['live' => false, 'blur' => false, 'syncOnBlur' => true, 'throttle' => false, 'delay' => 150]],
-    'live' => ['.live', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
-    'live blur is network on blur only' => ['.live.blur', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
-    'blur live syncs on blur then debounces' => ['.blur.live', ['live' => true, 'blur' => false, 'syncOnBlur' => true, 'throttle' => false, 'delay' => 150]],
-    'live debounce' => ['.live.debounce.500ms', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 500]],
-    'live throttle' => ['.live.throttle.2s', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'throttle' => true, 'delay' => 2000]],
-    'debounce without live sends nothing' => ['.debounce.500ms', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
-    'lazy sends on change' => ['.lazy', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'throttle' => false, 'delay' => 150]],
+    'deferred' => ['', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'debounce' => 150, 'throttle' => null]],
+    'blur is local only' => ['.blur', ['live' => false, 'blur' => false, 'syncOnBlur' => true, 'debounce' => 150, 'throttle' => null]],
+    'live' => ['.live', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'debounce' => 150, 'throttle' => null]],
+    'live blur is network on blur only' => ['.live.blur', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'debounce' => 150, 'throttle' => null]],
+    'blur live syncs on blur then debounces' => ['.blur.live', ['live' => true, 'blur' => false, 'syncOnBlur' => true, 'debounce' => 150, 'throttle' => null]],
+    'live debounce' => ['.live.debounce.500ms', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'debounce' => 500, 'throttle' => null]],
+    'live throttle' => ['.live.throttle.2s', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'debounce' => null, 'throttle' => 2000]],
+    'live debounce and throttle together' => ['.live.debounce.300ms.throttle.1s', ['live' => true, 'blur' => false, 'syncOnBlur' => false, 'debounce' => 300, 'throttle' => 1000]],
+    'debounce without live sends nothing' => ['.debounce.500ms', ['live' => false, 'blur' => false, 'syncOnBlur' => false, 'debounce' => 150, 'throttle' => null]],
+    'lazy sends on change' => ['.lazy', ['live' => true, 'blur' => true, 'syncOnBlur' => false, 'debounce' => 150, 'throttle' => null]],
 ]);

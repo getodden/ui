@@ -373,8 +373,21 @@ final class RichJson
     private function listItems(array $nodes): array
     {
         return array_map(
-            fn (array $node): array => ($node['type'] ?? null) === 'listItem' ? $node : ['type' => 'listItem', 'content' => $this->blocks([$node])],
+            fn (array $node): array => ($node['type'] ?? null) === 'listItem' ? $node : $this->listItem($this->blocks([$node])),
             $nodes,
         );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $blocks
+     * @return array<string, mixed>
+     */
+    private function listItem(array $blocks): array
+    {
+        if (($blocks[0]['type'] ?? null) !== 'paragraph') {
+            array_unshift($blocks, ['type' => 'paragraph']);
+        }
+
+        return ['type' => 'listItem', 'content' => $blocks];
     }
 }

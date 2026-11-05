@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { getSchema } from '@tiptap/core'
-import Mention from '@tiptap/extension-mention'
-import StarterKit from '@tiptap/starter-kit'
+import { buildExtensions } from '../../resources/js/editor.js'
 
-const schema = getSchema([StarterKit.configure({ heading: { levels: [1, 2, 3, 4] } }), Mention])
+const schema = getSchema(buildExtensions({
+    toolbar: ['link'],
+    mentionChar: '@',
+    suggestion: null,
+    openLink: () => {},
+}))
 const documents = JSON.parse(readFileSync(process.argv[2], 'utf8'))
 
 documents.forEach((document) => {

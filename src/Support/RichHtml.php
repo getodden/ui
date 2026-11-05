@@ -101,7 +101,7 @@ final class RichHtml
 
     private static function assertTagsAreShort(string $html): void
     {
-        $count = preg_match_all('/<[a-zA-Z!\/?][^\s>\/]*+(?:[^>"\']++|"[^"]*+"|\'[^\']*+\')*+>?/', $html, $tags);
+        $count = preg_match_all('/<[a-zA-Z!\/?][^\s>\/]*+(?:\s*+=\s*+(?:"[^"]*+"?|\'[^\']*+\'?)|[^>])*+>?/', $html, $tags);
 
         if ($count === false) {
             throw new LengthException('The HTML has a tag that RichHtml::clean() cannot scan.');

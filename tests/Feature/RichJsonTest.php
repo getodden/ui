@@ -142,8 +142,26 @@ it('treats a top-level list of nodes as the content of the document', function (
     expect(RichJson::clean([['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]))->toBe(['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'x']]]]]);
 });
 
+dataset('list shapes', [
+    'a heading directly in an ordered list' => [['type' => 'doc', 'content' => [['type' => 'orderedList', 'content' => [['type' => 'heading', 'attrs' => ['level' => 2], 'content' => [['type' => 'text', 'text' => 'h']]]]]]]],
+    'a list directly in a list' => [['type' => 'doc', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph']]]]]]]]]],
+]);
+
+it('starts every list item with a paragraph, also when it wraps a loose child', function (array $document): void {
+    $clean = RichJson::clean($document);
+
+    foreach ($clean['content'][0]['content'] as $item) {
+        expect($item['type'])->toBe('listItem')
+            ->and($item['content'][0]['type'])->toBe('paragraph');
+    }
+
+    expect(RichJson::clean($clean))->toBe($clean);
+})->with('list shapes');
+
 it('produces documents the editor schema accepts for every hostile document', function (): void {
     $documents = [
+        ['type' => 'doc', 'content' => [['type' => 'orderedList', 'content' => [['type' => 'heading', 'attrs' => ['level' => 2], 'content' => [['type' => 'text', 'text' => 'h']]]]]]],
+        ['type' => 'doc', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'paragraph']]]]]]]]],
         ['type' => 'doc', 'content' => [['type' => 'doc', 'content' => [['type' => 'text', 'text' => 'a']]], ['type' => 'listItem'], ['type' => 'bulletList'], ['type' => 'orderedList', 'content' => [['type' => 'paragraph']]]]],
         ['type' => 'doc', 'content' => [['type' => 'bulletList', 'content' => [['type' => 'listItem', 'content' => [['type' => 'heading', 'attrs' => ['level' => 2], 'content' => [['type' => 'text', 'text' => 'h']]]]]]]]],
         ['type' => 'doc', 'content' => [['type' => 'table', 'content' => [['type' => 'tableRow', 'content' => [['type' => 'tableCell', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'c']]]]]]]]], ['type' => 'image'], ['type' => 'text', 'text' => 'loose', 'marks' => [['type' => 'bold'], ['type' => 'code']]]]],
@@ -158,7 +176,7 @@ it('produces documents the editor schema accepts for every hostile document', fu
     $path = tempnam(sys_get_temp_dir(), 'rich-json');
     file_put_contents($path, json_encode(array_map(fn (array $document): array => RichJson::clean($document), $documents)));
 
-    $output = shell_exec('node '.escapeshellarg(dirname(__DIR__).'/Support/EditorSchemaCheck.mjs').' '.escapeshellarg($path).' 2>&1');
+    $output = shell_exec('node --no-warnings '.escapeshellarg(dirname(__DIR__).'/Support/EditorSchemaCheck.mjs').' '.escapeshellarg($path).' 2>&1');
     unlink($path);
 
     expect(trim((string) $output))->toBe('ok '.count($documents));

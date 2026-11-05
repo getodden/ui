@@ -155,10 +155,79 @@ function createMention(char, suggestion) {
     })
 }
 
+function debounce(callback, wait) {
+    let timer = null
+    const run = () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+            timer = null
+            callback()
+        }, wait)
+    }
+
+    run.cancel = () => {
+        clearTimeout(timer)
+        timer = null
+    }
+
+    return run
+}
+
+function throttle(callback, limit) {
+    let held = false
+
+    return () => {
+        if (held) {
+            return
+        }
+
+        callback()
+        held = true
+        setTimeout(() => {
+            held = false
+        }, limit)
+    }
+}
+
+export function buildExtensions({ toolbar, mentionChar, suggestion, openLink }) {
+    const extensions = [
+        StarterKit.configure({
+            heading: { levels: [1, 2, 3, 4] },
+            trailingNode: false,
+            link: {
+                HTMLAttributes: { target: null, rel: null },
+                openOnClick: false,
+                autolink: true,
+                defaultProtocol: 'https',
+                isAllowedUri: (url) => isAllowedUri(url),
+            },
+        }),
+        createMention(mentionChar, suggestion),
+    ]
+
+    if (toolbar.includes('link')) {
+        extensions.push(Extension.create({
+            name: 'uiEditorShortcuts',
+            addKeyboardShortcuts() {
+                return {
+                    'Mod-k': () => {
+                        openLink()
+
+                        return true
+                    },
+                }
+            },
+        }))
+    }
+
+    return extensions
+}
+
 export default function editor(config) {
     let instance = null
     let observer = null
-    let commitTimer = null
+    let schedule = null
+    let cancelScheduled = null
     let pendingSync = false
     let uncommitted = false
     let removeListeners = null
@@ -175,38 +244,19 @@ export default function editor(config) {
         suggest: { open: false, loading: false, items: [], index: 0, top: 0, left: 0, status: '' },
 
         init() {
-            const self = this
-            const hasLink = config.toolbar.includes('link')
             const hasMentionSource = config.mentions !== null || config.mentionSearch !== null
-            const extensions = [
-                StarterKit.configure({
-                    heading: { levels: [1, 2, 3, 4] },
-                    trailingNode: false,
-                    link: {
-                        HTMLAttributes: { target: null, rel: null },
-                        openOnClick: false,
-                        autolink: true,
-                        defaultProtocol: 'https',
-                        isAllowedUri: (url) => isAllowedUri(url),
-                    },
-                }),
-                createMention(config.mentionChar, hasMentionSource ? this.suggestionOptions() : null),
-            ]
+            const extensions = buildExtensions({
+                toolbar: config.toolbar,
+                mentionChar: config.mentionChar,
+                suggestion: hasMentionSource ? this.suggestionOptions() : null,
+                openLink: () => this.openLink(),
+            })
 
-            if (hasLink) {
-                extensions.push(Extension.create({
-                    name: 'uiEditorShortcuts',
-                    addKeyboardShortcuts() {
-                        return {
-                            'Mod-k': () => {
-                                self.openLink()
+            const debouncer = config.commit.debounce === null ? null : debounce(() => this.commit(), config.commit.debounce)
+            const throttler = config.commit.throttle === null ? null : throttle(debouncer ?? (() => this.commit()), config.commit.throttle)
 
-                                return true
-                            },
-                        }
-                    },
-                }))
-            }
+            schedule = throttler ?? debouncer
+            cancelScheduled = debouncer?.cancel ?? null
 
             instance = new Editor({
                 element: this.$refs.host,
@@ -274,23 +324,13 @@ export default function editor(config) {
         },
 
         scheduleCommit() {
-            if (!config.commit.live || config.commit.blur) {
-                return
+            if (config.commit.live && !config.commit.blur) {
+                schedule?.()
             }
-
-            if (config.commit.throttle) {
-                commitTimer ??= setTimeout(() => this.commit(), config.commit.delay)
-
-                return
-            }
-
-            clearTimeout(commitTimer)
-            commitTimer = setTimeout(() => this.commit(), config.commit.delay)
         },
 
         commit() {
-            clearTimeout(commitTimer)
-            commitTimer = null
+            cancelScheduled?.()
             uncommitted = false
             this.$wire.$commit()
         },
@@ -319,7 +359,12 @@ export default function editor(config) {
         },
 
         destroy() {
-            clearTimeout(commitTimer)
+            cancelScheduled?.()
+
+            if (pendingSync && instance !== null && !this.unreadable) {
+                this.state = this.output()
+            }
+
             observer?.disconnect()
             removeListeners?.()
             instance?.destroy()

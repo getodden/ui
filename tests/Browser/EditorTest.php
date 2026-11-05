@@ -430,3 +430,13 @@ it('sends a live blur editor once, on blur, and only when it changed', function 
 
     expect($page->script(editorSettled('window.updates')))->toBe(1);
 });
+
+it('keeps the edit of a blur editor that is removed while it has focus', function (): void {
+    $page = visit('/');
+
+    $page->click('#editor-blur [role=textbox]')->keys('#editor-blur [role=textbox]', ['a', 'b']);
+
+    $value = $page->script('(() => { const component = Livewire.find(document.querySelector("#editor-body").closest("[wire\\\\:id]").getAttribute("wire:id")); Alpine.$data(document.querySelector("#editor-blur [x-data]")).destroy(); return new Promise((resolve) => setTimeout(() => resolve(component.blurBody), 300)) })()');
+
+    expect($value)->toBe('<p>ab</p>');
+});

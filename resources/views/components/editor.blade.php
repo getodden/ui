@@ -30,14 +30,24 @@
     $networkModifiers = $liveIndex !== false ? array_slice($modelModifiers, $liveIndex + 1) : [];
     $syncOnBlur = ! $lazyWithoutLive && (bool) array_intersect(['blur', 'change', 'lazy'], $syncModifiers);
     $commitOnBlur = $lazyWithoutLive || ($live && (bool) array_intersect(['blur', 'change', 'lazy'], $networkModifiers));
-    $commitThrottled = in_array('throttle', $networkModifiers, true) && ! in_array('debounce', $networkModifiers, true);
-    $durationIndex = array_search($commitThrottled ? 'throttle' : 'debounce', $networkModifiers, true);
-    $durationValue = $durationIndex === false ? null : ($networkModifiers[$durationIndex + 1] ?? null);
-    $commitDelay = 150;
+    $durationOf = function (string $modifier) use ($networkModifiers): ?int {
+        $index = array_search($modifier, $networkModifiers, true);
 
-    if (is_string($durationValue) && preg_match('/^(\d+(?:\.\d+)?)(ms|s)?$/', $durationValue, $durationMatches) === 1) {
-        $commitDelay = (int) round((float) $durationMatches[1] * (($durationMatches[2] ?? 'ms') === 's' ? 1000 : 1));
-    }
+        if ($index === false) {
+            return null;
+        }
+
+        $value = $networkModifiers[$index + 1] ?? null;
+
+        if (is_string($value) && preg_match('/^(\d+(?:\.\d+)?)(ms|s)?$/', $value, $matches) === 1) {
+            return (int) round((float) $matches[1] * (($matches[2] ?? 'ms') === 's' ? 1000 : 1));
+        }
+
+        return 150;
+    };
+    $commitDebounce = $durationOf('debounce');
+    $commitThrottle = $durationOf('throttle');
+    $commitDebounce ??= $commitThrottle === null ? 150 : null;
 
     $mentionItems = $mentions === null
         ? null
@@ -72,7 +82,7 @@
         'mentions' => $mentionItems,
         'mentionSearch' => $mentionSearch,
         'mentionChar' => $mentionChar,
-        'commit' => ['live' => $live, 'blur' => $commitOnBlur, 'syncOnBlur' => $syncOnBlur, 'throttle' => $commitThrottled, 'delay' => $commitDelay],
+        'commit' => ['live' => $live, 'blur' => $commitOnBlur, 'syncOnBlur' => $syncOnBlur, 'debounce' => $commitDebounce, 'throttle' => $commitThrottle],
         'unreadableId' => $field->id.'-unreadable',
         'linkErrorId' => $field->id.'-link-error',
         'listboxId' => $field->id.'-mentions',

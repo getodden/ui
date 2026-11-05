@@ -313,6 +313,9 @@ dataset('worst cases', [
     'many attributes in one tag' => fn () => '<p '.implode(' ', array_map(fn (int $i): string => "a{$i}=1", range(1, 30000))).'>x</p>',
     'boolean attributes up to the byte limit' => fn () => '<p '.implode(' ', array_map(fn (int $i): string => base_convert((string) ($i + 1296), 10, 36), range(1, 60000))).'>x</p>',
     'quoted attributes holding angle brackets' => fn () => '<p '.str_repeat('a="x>y" ', 30000).'>x</p>',
+    'a stray single quote before many attributes' => fn () => '<p z=x\' '.implode(' ', array_map(fn (int $i): string => "a{$i}", range(1, 30000))).'>x</p>',
+    'a stray double quote before many attributes' => fn () => '<p z=x" '.implode(' ', array_map(fn (int $i): string => "a{$i}", range(1, 30000))).'>x</p>',
+    'a quote opening an attribute name' => fn () => "<p 'z ".implode(' ', array_map(fn (int $i): string => "a{$i}", range(1, 30000))).'>x</p>',
     'unterminated tags' => fn () => str_repeat('<p ', RichHtml::MAXIMUM_TAGS - 1),
     'unterminated comments' => fn () => str_repeat('<!--', RichHtml::MAXIMUM_TAGS - 1),
     'a long comment' => fn () => '<!--'.str_repeat('a', 100000).'-->',
@@ -337,6 +340,11 @@ it('cleans the worst input within the limits fast and in little memory', functio
         expect(RichHtml::clean($result['clean']))->toBe($result['clean']);
     }
 })->with('worst cases');
+
+it('still reads a quoted value that holds an angle bracket as one tag', function (): void {
+    expect(RichHtml::clean('<p title="a>b">x</p>'))->toBe('<p>x</p>')
+        ->and(fn () => RichHtml::clean('<p title="a>b" '.str_repeat('a ', 5000).'>x</p>'))->toThrow(LengthException::class);
+});
 
 it('refuses a tag longer than the tag limit', function (): void {
     expect(fn () => RichHtml::clean('<p title="'.str_repeat('a', RichHtml::MAXIMUM_TAG_BYTES).'">x</p>'))->toThrow(LengthException::class)
