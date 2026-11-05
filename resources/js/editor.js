@@ -1,10 +1,11 @@
-import { Editor, Extension, mergeAttributes } from '@tiptap/core'
+import { createDocument, Editor, Extension, mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Mention from '@tiptap/extension-mention'
 
 const allowedProtocols = ['http', 'https', 'mailto', 'tel']
 const maximumSuggestions = 8
 const schemePattern = /^([a-z][a-z0-9+.-]*):/i
+const controlPattern = /[\x00-\x1f\x7f-\x9f\u{200b}-\u{200d}\u{2028}\u{2029}\u{feff}]/gu
 const invisiblePattern = /[\x00-\x20\x7f-\x9f\u{200b}-\u{200d}\u{2028}\u{2029}\u{feff}]/gu
 
 const tools = {
@@ -22,9 +23,33 @@ export function isAllowedUri(uri) {
         return false
     }
 
-    const match = schemePattern.exec(uri.replace(invisiblePattern, ''))
+    const stripped = uri.replace(controlPattern, '').trim()
+
+    if (/^(?:\/(?![\/\\])|#|\?)/.test(stripped)) {
+        return true
+    }
+
+    const match = schemePattern.exec(stripped.replace(/\s+/g, ''))
 
     return match !== null && allowedProtocols.includes(match[1].toLowerCase())
+}
+
+function sanitizeDocument(node) {
+    if (node === null || typeof node !== 'object') {
+        return node
+    }
+
+    const copy = Array.isArray(node) ? [...node] : { ...node }
+
+    if (Array.isArray(copy.marks)) {
+        copy.marks = copy.marks.filter((mark) => mark?.type !== 'link' || isAllowedUri(mark.attrs?.href))
+    }
+
+    if (Array.isArray(copy.content)) {
+        copy.content = copy.content.map(sanitizeDocument)
+    }
+
+    return copy
 }
 
 function normalizeAddress(address) {
@@ -70,6 +95,10 @@ function createMention(char, suggestion) {
             return { ...this.parent?.(), deleteTriggerWithBackspace: true }
         },
 
+        addProseMirrorPlugins() {
+            return suggestion === null ? [] : (this.parent?.() ?? [])
+        },
+
         addAttributes() {
             return {
                 id: {
@@ -105,7 +134,7 @@ function createMention(char, suggestion) {
     }).configure({
         suggestion: {
             char,
-            ...suggestion,
+            ...(suggestion ?? {}),
             command: ({ editor, range, props }) => {
                 const nodeAfter = editor.view.state.selection.$to.nodeAfter
 
@@ -129,6 +158,7 @@ function createMention(char, suggestion) {
 export default function editor(config) {
     let instance = null
     let observer = null
+    let commitTimer = null
     let removeListeners = null
     let commitSuggestion = null
 
@@ -136,14 +166,19 @@ export default function editor(config) {
         state: config.state ?? (config.format === 'json' ? null : ''),
         active: {},
         toolbarIndex: 0,
+        unreadable: false,
+        optionPrefix: config.optionPrefix,
+        linkErrorId: config.linkErrorId,
         link: { open: false, url: '', error: null, existing: false },
         suggest: { open: false, loading: false, items: [], index: 0, top: 0, left: 0, status: '' },
 
         init() {
             const self = this
+            const hasLink = config.toolbar.includes('link')
+            const hasMentionSource = config.mentions !== null || config.mentionSearch !== null
             const extensions = [
                 StarterKit.configure({
-                    heading: { levels: [2, 3, 4] },
+                    heading: { levels: [1, 2, 3, 4] },
                     link: {
                         openOnClick: false,
                         autolink: true,
@@ -151,7 +186,11 @@ export default function editor(config) {
                         isAllowedUri: (url) => isAllowedUri(url),
                     },
                 }),
-                Extension.create({
+                createMention(config.mentionChar, hasMentionSource ? this.suggestionOptions() : null),
+            ]
+
+            if (hasLink) {
+                extensions.push(Extension.create({
                     name: 'uiEditorShortcuts',
                     addKeyboardShortcuts() {
                         return {
@@ -162,43 +201,73 @@ export default function editor(config) {
                             },
                         }
                     },
-                }),
-            ]
-
-            if (config.mentions !== null || config.mentionSearch !== null) {
-                extensions.push(createMention(config.mentionChar, this.suggestionOptions()))
+                }))
             }
 
             instance = new Editor({
                 element: this.$refs.host,
                 extensions,
                 content: this.contentFor(this.state),
+                enableContentCheck: true,
                 editorProps: { attributes: this.attributes() },
+                onContentError: () => {
+                    this.unreadable = true
+                },
                 onUpdate: () => {
+                    if (this.unreadable) {
+                        return
+                    }
+
                     this.state = this.output()
                     this.$dispatch('ui-editor-input', { value: this.state })
+                    this.scheduleCommit()
                 },
                 onTransaction: () => this.refreshActive(),
                 onBlur: () => {
-                    if (config.commitOnBlur) {
-                        this.$wire.$commit()
+                    if (config.commit.blur && !this.unreadable) {
+                        this.commit()
                     }
                 },
             })
 
+            if (this.unreadable) {
+                instance.setEditable(false)
+                this.syncAttributes()
+            }
+
             this.refreshActive()
 
             this.$watch('state', (value) => {
-                if (!this.matchesEditor(value)) {
-                    instance.commands.setContent(this.contentFor(value), { emitUpdate: false })
+                if (this.matchesEditor(value)) {
+                    return
                 }
+
+                this.unreadable = false
+                instance.commands.setContent(this.contentFor(value), { emitUpdate: false })
+                instance.setEditable(!this.unreadable)
+                this.syncAttributes()
             })
 
             observer = new MutationObserver(() => this.syncAttributes())
             observer.observe(this.$refs.meta, { attributes: true })
         },
 
+        scheduleCommit() {
+            if (!config.commit.live) {
+                return
+            }
+
+            clearTimeout(commitTimer)
+            commitTimer = setTimeout(() => this.commit(), config.commit.delay)
+        },
+
+        commit() {
+            clearTimeout(commitTimer)
+            this.$wire.$commit()
+        },
+
         destroy() {
+            clearTimeout(commitTimer)
             observer?.disconnect()
             removeListeners?.()
             instance?.destroy()
@@ -207,7 +276,7 @@ export default function editor(config) {
 
         output() {
             if (config.format === 'json') {
-                return instance.getJSON()
+                return sanitizeDocument(instance.getJSON())
             }
 
             return instance.isEmpty ? '' : instance.getHTML()
@@ -215,19 +284,26 @@ export default function editor(config) {
 
         contentFor(value) {
             if (config.format === 'json') {
-                return value !== null && typeof value === 'object' && Object.keys(value).length > 0 ? value : ''
+                return value !== null && typeof value === 'object' && Object.keys(value).length > 0 ? sanitizeDocument(value) : ''
             }
 
             return typeof value === 'string' ? value : ''
         },
 
         matchesEditor(value) {
-            if (config.format === 'json') {
-                return canonical(value ?? {}) === canonical(this.output())
-                    || (Object.keys(value ?? {}).length === 0 && instance.isEmpty)
+            const fingerprint = (candidate) => (config.format === 'json' ? canonical(candidate ?? {}) : (candidate ?? ''))
+
+            if (fingerprint(value) === fingerprint(this.output())) {
+                return true
             }
 
-            return (value ?? '') === this.output()
+            try {
+                const incoming = createDocument(this.contentFor(value), instance.schema, instance.options.parseOptions)
+
+                return incoming.eq(instance.state.doc)
+            } catch {
+                return false
+            }
         },
 
         attributes() {
@@ -251,8 +327,14 @@ export default function editor(config) {
                 attributes['aria-label'] = label
             }
 
-            if (describedBy) {
-                attributes['aria-describedby'] = describedBy
+            const describers = [describedBy, this.unreadable ? config.unreadableId : null].filter(Boolean)
+
+            if (describers.length > 0) {
+                attributes['aria-describedby'] = describers.join(' ')
+            }
+
+            if (this.unreadable) {
+                attributes['aria-readonly'] = 'true'
             }
 
             if (meta.hasAttribute('data-invalid')) {
@@ -408,7 +490,7 @@ export default function editor(config) {
                 debounce: search ? 250 : 0,
                 items: async ({ query }) => {
                     if (search) {
-                        return normalizeItems(await self.$wire[config.mentionSearch](query))
+                        return normalizeItems(await self.$wire.$call(config.mentionSearch, query))
                     }
 
                     const needle = query.toLowerCase()

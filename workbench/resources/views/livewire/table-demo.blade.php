@@ -6,7 +6,8 @@
             <x-ui::input id="fruit-search" type="search" wire:model.live.debounce.250ms="search" label="Search fruit" />
             <x-ui::select id="fruit-colour" wire:model.live="filters.colour" label="Colour" :options="$colours" placeholder="All colours" />
             <x-ui::select id="fruit-per-page" wire:model.live="perPage" label="Rows per page" :options="[10 => '10', 25 => '25']" />
-            <x-ui::button id="fruit-slow" variant="secondary" wire:click="slowRefresh">Slow refresh</x-ui::button>
+            <x-ui::button id="fruit-unrelated" variant="secondary" wire:click="unrelatedAction">Unrelated</x-ui::button>
+            <span id="fruit-unrelated-count">{{ $unrelated }}</span>
         </x-slot:toolbar>
 
         @foreach ($records as $fruit)

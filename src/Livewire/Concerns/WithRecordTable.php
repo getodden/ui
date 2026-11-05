@@ -16,35 +16,20 @@ trait WithRecordTable
 {
     use WithPagination;
 
-    /**
-     * @var mixed
-     */
     #[Url(except: '')]
-    public $search = '';
+    public mixed $search = '';
 
-    /**
-     * @var mixed
-     */
     #[Url(except: '')]
-    public $sort = '';
+    public mixed $sort = '';
 
-    /**
-     * @var mixed
-     */
     #[Url(except: '')]
-    public $direction = '';
+    public mixed $direction = '';
 
-    /**
-     * @var mixed
-     */
     #[Url(except: [])]
-    public $filters = [];
+    public mixed $filters = [];
 
-    /**
-     * @var mixed
-     */
     #[Url(except: 10)]
-    public $perPage = 10;
+    public mixed $perPage = 10;
 
     /**
      * @return array<string, string|Closure(EloquentBuilder<*>|QueryBuilder, string): void>
@@ -98,12 +83,12 @@ trait WithRecordTable
 
         $base = $query instanceof EloquentBuilder ? $query->getQuery() : $query;
         $grammar = $base->getGrammar();
-        $pattern = '%'.mb_strtolower((string) preg_replace('/[!%_]/', '!$0', $term)).'%';
+        $pattern = '%'.(string) preg_replace('/[!%_]/', '!$0', $term).'%';
 
         $query->where(function (EloquentBuilder|QueryBuilder $group) use ($columns, $grammar, $pattern): void {
             foreach ($columns as $column) {
                 // @phpstan-ignore argument.type
-                $group->orWhereRaw('lower('.$grammar->wrap($column).") like ? escape '!'", [$pattern]);
+                $group->orWhereRaw('lower('.$grammar->wrap($column).") like lower(?) escape '!'", [$pattern]);
             }
         });
     }
@@ -215,6 +200,12 @@ trait WithRecordTable
      */
     protected function applyRecordTable(EloquentBuilder|QueryBuilder $query): void
     {
+        $sort = $this->activeSort();
+
+        if ($sort !== null) {
+            $query->reorder();
+        }
+
         $term = $this->activeSearch();
 
         if ($term !== '') {
@@ -227,16 +218,9 @@ trait WithRecordTable
             $filters[$key]($query, $value);
         }
 
-        $sort = $this->activeSort();
-
-        if ($sort === null) {
-            return;
+        if ($sort !== null) {
+            $this->orderUsing($query, $this->sortableColumns()[$sort], $this->activeDirection());
         }
-
-        $direction = $this->activeDirection();
-        $column = $this->sortableColumns()[$sort];
-
-        $this->orderUsing($query, $column, $direction);
 
         if ($query instanceof EloquentBuilder) {
             $query->orderBy($query->getModel()->getQualifiedKeyName());
@@ -251,7 +235,15 @@ trait WithRecordTable
     {
         $this->applyRecordTable($query);
 
-        return $query->paginate($this->activePerPage());
+        $perPage = $this->activePerPage();
+        $records = $query->paginate($perPage);
+
+        if ($records->total() > 0 && $records->currentPage() > $records->lastPage()) {
+            $this->setPage($records->lastPage());
+            $records = $query->paginate($perPage);
+        }
+
+        return $records;
     }
 
     /**

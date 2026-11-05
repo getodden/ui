@@ -6,7 +6,7 @@
 
 @if ($paginator->hasPages())
     <nav aria-label="{{ __('ui::ui.table.pagination') }}" class="flex flex-wrap items-center justify-center gap-1">
-        <button type="button" wire:click="previousPage('{{ $pageName }}')" @disabled($paginator->onFirstPage()) class="{{ $buttonClasses }}">{{ __('ui::ui.table.previous') }}</button>
+        <button type="button" @if ($paginator->onFirstPage()) aria-disabled="true" @else wire:click="previousPage('{{ $pageName }}')" @endif class="{{ $buttonClasses }} aria-disabled:cursor-not-allowed aria-disabled:opacity-50">{{ __('ui::ui.table.previous') }}</button>
 
         @foreach ($elements as $element)
             @if (is_string($element))
@@ -14,7 +14,7 @@
             @elseif (is_array($element))
                 @foreach ($element as $page => $url)
                     @if ($page === $paginator->currentPage())
-                        <span aria-current="page" class="{{ $currentClasses }}"><span class="sr-only">{{ __('ui::ui.table.page') }} </span>{{ $page }}</span>
+                        <button type="button" aria-current="page" class="{{ $currentClasses }}"><span class="sr-only">{{ __('ui::ui.table.page') }} </span>{{ $page }}</button>
                     @else
                         <button type="button" wire:click="gotoPage({{ $page }}, '{{ $pageName }}')" aria-label="{{ __('ui::ui.table.go_to_page', ['page' => $page]) }}" class="{{ $buttonClasses }}">{{ $page }}</button>
                     @endif
@@ -22,6 +22,6 @@
             @endif
         @endforeach
 
-        <button type="button" wire:click="nextPage('{{ $pageName }}')" @disabled(! $paginator->hasMorePages()) class="{{ $buttonClasses }}">{{ __('ui::ui.table.next') }}</button>
+        <button type="button" @if ($paginator->hasMorePages()) wire:click="nextPage('{{ $pageName }}')" @else aria-disabled="true" @endif class="{{ $buttonClasses }} aria-disabled:cursor-not-allowed aria-disabled:opacity-50">{{ __('ui::ui.table.next') }}</button>
     </nav>
 @endif

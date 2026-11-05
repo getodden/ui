@@ -141,7 +141,8 @@ it('adds a link through the inline form and refuses an unsafe address', function
     $page->keys(':focus', ['ControlOrMeta+a', 'e', 'x', 'a', 'm', 'p', 'l', 'e', '.', 'o', 'r', 'g'])
         ->click('#editor-body [data-link-apply]')
         ->assertSeeIn('#saved-body', '<p><a target="_blank" rel="noopener noreferrer nofollow" href="https://example.org">x</a></p>')
-        ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-pressed") === "true"');
+        ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-expanded") === "false"')
+        ->assertScript('!document.querySelector("#editor-body [data-tool=link]").hasAttribute("aria-pressed")');
 });
 
 it('closes the link form on Escape and returns focus to the editor', function (): void {
@@ -257,4 +258,101 @@ it('has no accessibility issues with the link form open', function (): void {
     $page->click('#editor-body [data-tool=link]')
         ->assertVisible('#ui-body-link-address')
         ->assertNoAccessibilityIssues();
+});
+
+it('round-trips Filament-shaped HTML through the editor unchanged', function (): void {
+    $page = visit('/');
+
+    $result = $page->script(editorSettled('{ editor: document.querySelector("#editor-filament [role=textbox]").innerHTML.replaceAll(" contenteditable=\"false\"", ""), saved: '.savedText('#saved-filament').' }'));
+
+    expect($result['editor'])->toBe($result['saved']);
+});
+
+it('refuses to edit stored JSON the editor cannot show and says so', function (): void {
+    $page = visit('/');
+
+    $before = $page->script(savedText('#saved-unreadable'));
+
+    $page->click('#editor-unreadable [role=textbox]');
+
+    $page->assertSee("This text has content the editor can't show")
+        ->assertScript('document.querySelector("#editor-unreadable [role=textbox]").getAttribute("contenteditable") === "false"')
+        ->assertScript('document.querySelector("#editor-unreadable [role=textbox]").getAttribute("aria-describedby").split(" ").includes("ui-unreadableDoc-unreadable")')
+        ->assertScript('document.querySelector("#editor-unreadable [role=toolbar]").offsetParent === null')
+        ->keys('#editor-unreadable [role=textbox]', ['x', 'y']);
+
+    $after = $page->script(editorSettled(savedText('#saved-unreadable')));
+
+    expect($after)->toBe($before)->and($after)->toContain('"type":"image"');
+});
+
+it('never emits an unsafe link href from loaded JSON', function (): void {
+    $page = visit('/');
+
+    $page->assertScript('document.querySelectorAll("#editor-linkdoc a[href^=javascript]").length === 0')
+        ->click('#editor-linkdoc [role=textbox]')
+        ->keys('#editor-linkdoc [role=textbox]', ['ControlOrMeta+End', 'x'])
+        ->assertSeeIn('#saved-linkdoc', 'goodx');
+
+    $saved = $page->script(savedText('#saved-linkdoc'));
+
+    expect($saved)->not->toContain('javascript:')->and($saved)->toContain('bad');
+});
+
+it('commits a live editor once per pause, using the debounce asked for', function (): void {
+    $page = visit('/');
+
+    $page->script('window.updates = 0; const original = window.fetch; window.fetch = (...arguments_) => { if (String(arguments_[0]).includes("livewire")) { window.updates++ } return original(...arguments_) }');
+
+    $page->click('#editor-debounced [role=textbox]')->keys('#editor-debounced [role=textbox]', ['a', 'b', 'c']);
+
+    expect($page->script('window.updates'))->toBe(0);
+
+    $page->assertSeeIn('#saved-debounced', '<p>abc</p>');
+
+    expect($page->script(editorSettled('window.updates')))->toBe(1);
+});
+
+it('keeps the caret when the server only normalises its echo', function (): void {
+    $page = visit('/');
+
+    $page->click(BODY_EDITABLE)->keys(BODY_EDITABLE, ['ControlOrMeta+a', 'a', 'b', 'c', 'd'])
+        ->assertSeeIn('#saved-body', '<p>abcd</p>')
+        ->keys(BODY_EDITABLE, ['ArrowLeft', 'ArrowLeft']);
+
+    $page->script('Livewire.find(document.querySelector("#editor-body").closest("[wire\\\\:id]").getAttribute("wire:id")).padBody()');
+    $page->script(editorSettled('true'));
+
+    $page->keys(BODY_EDITABLE, 'X')->assertSeeIn('#saved-body', '<p>abXcd</p>');
+});
+
+it('ignores the link shortcut when the toolbar has no link tool', function (): void {
+    $page = visit('/');
+
+    $page->click(SEARCH_EDITABLE)->keys(SEARCH_EDITABLE, 'ControlOrMeta+k')
+        ->assertNoJavaScriptErrors()
+        ->assertScript('document.activeElement === document.querySelector("'.SEARCH_EDITABLE.'")');
+});
+
+it('keeps an explicit id with quotes out of the Alpine expressions', function (): void {
+    $page = visit('/');
+    $id = "x'+alert(1)+'";
+
+    $page->click('#editor-odd [data-tool=link]')
+        ->assertScript('document.activeElement.id === "'.$id.'-link-address"')
+        ->keys(':focus', ['j', 'a', 'v', 'a', 's', 'c', 'r', 'i', 'p', 't', ':', 'x', 'Enter'])
+        ->assertScript('document.activeElement.getAttribute("aria-describedby") === "'.$id.'-link-error"')
+        ->keys(':focus', 'Escape')
+        ->keys('#editor-odd [role=textbox]', ['@', 'a', 'd'])
+        ->assertScript('document.querySelector("#editor-odd [role=option]").id === "'.$id.'-mention-0"')
+        ->assertNoJavaScriptErrors();
+});
+
+it('names heading buttons by their visible text and exposes the link button as a disclosure', function (): void {
+    $page = visit('/');
+
+    $page->assertScript('[...document.querySelectorAll("#editor-body [data-tool^=heading]")].every((button) => button.getAttribute("aria-label").includes(button.textContent.trim()))')
+        ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-controls") === "ui-body-link"')
+        ->click('#editor-body [data-tool=link]')
+        ->assertScript('document.querySelector("#editor-body [data-tool=link]").getAttribute("aria-expanded") === "true"');
 });

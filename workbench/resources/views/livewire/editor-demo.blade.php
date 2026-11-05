@@ -26,6 +26,30 @@
     </div>
     <pre id="saved-json">{{ json_encode($mentionDoc) }}</pre>
 
+    <div id="editor-filament">
+        <x-ui::editor label="Filament content" wire:model="filament" />
+    </div>
+    <pre id="saved-filament">{{ $filament }}</pre>
+
+    <div id="editor-unreadable">
+        <x-ui::editor label="Unreadable" wire:model.live="unreadableDoc" format="json" />
+    </div>
+    <pre id="saved-unreadable">{{ json_encode($unreadableDoc) }}</pre>
+
+    <div id="editor-linkdoc">
+        <x-ui::editor label="Link document" wire:model.live="linkDoc" format="json" />
+    </div>
+    <pre id="saved-linkdoc">{{ json_encode($linkDoc) }}</pre>
+
+    <div id="editor-debounced">
+        <x-ui::editor label="Debounced" wire:model.live.debounce.500ms="debounced" :toolbar="[]" />
+    </div>
+    <pre id="saved-debounced">{{ $debounced }}</pre>
+
+    <div id="editor-odd">
+        <x-ui::editor id="x'+alert(1)+'" label="Odd id" wire:model="oddBody" :mentions="[['id' => '1', 'label' => 'Ada Lovelace']]" />
+    </div>
+
     <div id="editor-error">
         <x-ui::editor label="Required body" wire:model="emptyBody" error="Write something" required />
     </div>

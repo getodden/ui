@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Dom\HTMLDocument;
 use Odden\Ui\Support\RichHtml;
+use Workbench\App\Livewire\EditorDemo;
 
 dataset('parsers', ['html5' => [false], 'legacy' => [true]]);
 
@@ -114,7 +115,7 @@ function assertSafe(string $clean): void
 
         if ($name === 'a') {
             expect($element->getAttribute('rel'))->toBe('noopener noreferrer nofollow')
-                ->and($element->getAttribute('href'))->toMatch('/^(https?|mailto|tel):/i');
+                ->and($element->getAttribute('href'))->toMatch('/^((https?|mailto|tel):|\/(?![\/\\\\])|#|\?)/i');
 
             if ($element->hasAttribute('target')) {
                 expect($element->getAttribute('target'))->toBe('_blank');
@@ -183,7 +184,8 @@ it('writes the canonical form of equivalent markup', function (string $html, str
     'uppercase scheme' => ['<a href="HTTPS://Example.com/A">x</a>', '<a rel="noopener noreferrer nofollow" href="HTTPS://Example.com/A">x</a>'],
     'padded href' => ['<a href="  https://example.com  ">x</a>', '<a rel="noopener noreferrer nofollow" href="https://example.com">x</a>'],
     'unsafe link keeps its text' => ['<p><a href="javascript:alert(1)">click</a></p>', '<p>click</p>'],
-    'relative link keeps its text' => ['<a href="/x">click</a>', 'click'],
+    'relative link is kept' => ['<a href="/x">click</a>', '<a rel="noopener noreferrer nofollow" href="/x">click</a>'],
+    'bare relative link keeps its text' => ['<a href="x">click</a>', 'click'],
     'ordered list start one' => ['<ol start="1"><li>a</li></ol>', '<ol><li>a</li></ol>'],
     'ordered list bad start' => ['<ol start="x"><li>a</li></ol>', '<ol><li>a</li></ol>'],
     'other span' => ['<p><span class="x">a</span></p>', '<p>a</p>'],
@@ -229,3 +231,59 @@ it('stays stable on random tag soup', function (): void {
         expect(RichHtml::clean($clean))->toBe($clean);
     }
 });
+
+it('refuses input over the byte limit and over the tag limit', function (): void {
+    expect(fn () => RichHtml::clean(str_repeat('a', RichHtml::MAXIMUM_BYTES + 1)))->toThrow(LengthException::class)
+        ->and(fn () => RichHtml::clean(str_repeat('<b>', RichHtml::MAXIMUM_TAGS + 1)))->toThrow(LengthException::class)
+        ->and(fn () => RichHtml::cleanWithLegacyParser(str_repeat('<b>', RichHtml::MAXIMUM_TAGS + 1)))->toThrow(LengthException::class)
+        ->and(RichHtml::clean(str_repeat('a', RichHtml::MAXIMUM_BYTES)))->toBeString();
+});
+
+it('cleans input at the tag limit quickly', function (): void {
+    $started = microtime(true);
+
+    $clean = RichHtml::clean(str_repeat('<div>', RichHtml::MAXIMUM_TAGS).'deep');
+
+    expect(microtime(true) - $started)->toBeLessThan(1.0)
+        ->and($clean)->toBeString();
+});
+
+it('keeps relative hrefs that stay on the site and refuses protocol-relative ones', function (string $href, ?string $kept, bool $legacy): void {
+    $expected = $kept === null ? 'x' : '<a rel="noopener noreferrer nofollow" href="'.$kept.'">x</a>';
+
+    expect(cleanWith($legacy, '<a href="'.$href.'">x</a>'))->toBe($expected);
+})->with([
+    'path' => ['/docs/a?b=1', '/docs/a?b=1'],
+    'fragment' => ['#section', '#section'],
+    'query' => ['?page=2', '?page=2'],
+    'protocol relative' => ['//evil.example/x', null],
+    'backslash host' => ['/\\evil.example', null],
+    'tab host' => ['/&#9;/evil.example', null],
+    'bare word' => ['docs/a', null],
+])->with('parsers');
+
+it('keeps what Filament stores that the editor can show', function (string $html, bool $legacy): void {
+    expect(cleanWith($legacy, $html))->toBe($html);
+})->with([
+    'h1' => '<h1>One</h1>',
+    'code language' => '<pre><code class="language-php">echo 1;</code></pre>',
+    'ordered list type' => '<ol start="3" type="a"><li><p>c</p></li></ol>',
+    'ordered list type only' => '<ol type="I"><li><p>c</p></li></ol>',
+    'non-breaking space' => '<p>a&nbsp;b</p>',
+])->with('parsers');
+
+it('drops what does not belong in a code element or an ordered list', function (string $html, string $expected, bool $legacy): void {
+    expect(cleanWith($legacy, $html))->toBe($expected);
+})->with([
+    'language class outside pre' => ['<p><code class="language-php">x</code></p>', '<p><code>x</code></p>'],
+    'other classes' => ['<pre><code class="evil language-js hljs">x</code></pre>', '<pre><code class="language-js">x</code></pre>'],
+    'bad language' => ['<pre><code class="language-a&quot;b">x</code></pre>', '<pre><code>x</code></pre>'],
+    'bad list type' => ['<ol type="z"><li>a</li></ol>', '<ol><li>a</li></ol>'],
+    'del' => ['<p><del>gone</del></p>', '<p><s>gone</s></p>'],
+])->with('parsers');
+
+it('leaves Filament-shaped HTML unchanged', function (bool $legacy): void {
+    $html = (new EditorDemo)->filament;
+
+    expect(cleanWith($legacy, $html))->toBe($html);
+})->with('parsers');

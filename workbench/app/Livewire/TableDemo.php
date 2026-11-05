@@ -57,7 +57,15 @@ final class TableDemo extends Component
         return [10, 25];
     }
 
-    public function slowRefresh(): void
+    public int $unrelated = 0;
+
+    public function unrelatedAction(): void
+    {
+        usleep(600000);
+        $this->unrelated++;
+    }
+
+    public function updatedPerPage(): void
     {
         usleep(600000);
     }

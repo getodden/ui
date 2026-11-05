@@ -11,16 +11,23 @@ use DOMDocument;
 use DOMElement;
 use DOMNode;
 use DOMText;
+use LengthException;
 
 final class RichHtml
 {
+    public const MAXIMUM_BYTES = 262144;
+
+    public const MAXIMUM_TAGS = 10000;
+
     private const MAXIMUM_DEPTH = 100;
 
     private const MAXIMUM_PASSES = 5;
 
     private const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 
-    private const ALLOWED_PROTOCOLS = ['http', 'https', 'mailto', 'tel'];
+    private const ORDERED_LIST_TYPES = ['1', 'a', 'A', 'i', 'I'];
+
+    private const CODE_LANGUAGE_CLASS = '/^language-[A-Za-z0-9_+-]{1,32}$/';
 
     private const DROPPED_WITH_CONTENT = [
         'script', 'style', 'template', 'iframe', 'object', 'embed', 'svg', 'math',
@@ -31,10 +38,11 @@ final class RichHtml
         'b' => 'strong',
         'i' => 'em',
         'strike' => 's',
+        'del' => 's',
     ];
 
     private const PLAIN = [
-        'p', 'strong', 'em', 'u', 's', 'code', 'pre', 'blockquote', 'h2', 'h3', 'h4', 'ul', 'li',
+        'p', 'strong', 'em', 'u', 's', 'pre', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'ul', 'li',
     ];
 
     public static function clean(string $html): string
@@ -52,6 +60,10 @@ final class RichHtml
 
     private static function stabilise(string $html, bool $legacyParser): string
     {
+        if (strlen($html) > self::MAXIMUM_BYTES || substr_count($html, '<') > self::MAXIMUM_TAGS) {
+            throw new LengthException('The HTML is larger than RichHtml::clean() accepts.');
+        }
+
         $current = self::pass($html, $legacyParser);
 
         for ($pass = 1; $pass < self::MAXIMUM_PASSES; $pass++) {
@@ -141,6 +153,10 @@ final class RichHtml
 
     private static function element(DOMElement|HtmlElement $element, int $depth): string
     {
+        if ($depth >= self::MAXIMUM_DEPTH) {
+            return '';
+        }
+
         $namespace = $element->namespaceURI;
 
         if ($namespace !== null && $namespace !== self::HTML_NAMESPACE) {
@@ -153,14 +169,11 @@ final class RichHtml
             return '';
         }
 
-        if ($depth >= self::MAXIMUM_DEPTH) {
-            return '';
-        }
-
         $name = self::RENAMED[$name] ?? $name;
 
         return match (true) {
             $name === 'br' || $name === 'hr' => "<{$name}>",
+            $name === 'code' => self::code($element, $depth),
             $name === 'ol' => self::orderedList($element, $depth),
             $name === 'a' => self::anchor($element, $depth),
             $name === 'span' => self::mention($element, $depth),
@@ -179,17 +192,38 @@ final class RichHtml
         return "<{$name}>".self::children($element, $depth + 1)."</{$name}>";
     }
 
+    private static function code(DOMElement|HtmlElement $element, int $depth): string
+    {
+        $parent = $element->parentNode;
+        $insidePre = ($parent instanceof DOMElement || $parent instanceof HtmlElement) && strtolower((string) $parent->localName) === 'pre';
+        $class = '';
+
+        if ($insidePre) {
+            foreach (preg_split('/\s+/', trim((string) $element->getAttribute('class'))) ?: [] as $token) {
+                if (preg_match(self::CODE_LANGUAGE_CLASS, $token) === 1) {
+                    $class = ' class="'.$token.'"';
+
+                    break;
+                }
+            }
+        }
+
+        return "<code{$class}>".self::children($element, $depth + 1).'</code>';
+    }
+
     private static function orderedList(DOMElement|HtmlElement $element, int $depth): string
     {
         $start = trim((string) $element->getAttribute('start'));
+        $type = trim((string) $element->getAttribute('type'));
         $attribute = preg_match('/^\d{1,9}$/', $start) === 1 && $start !== '1' ? ' start="'.(int) $start.'"' : '';
+        $attribute .= in_array($type, self::ORDERED_LIST_TYPES, true) ? ' type="'.$type.'"' : '';
 
         return "<ol{$attribute}>".self::children($element, $depth + 1).'</ol>';
     }
 
     private static function anchor(DOMElement|HtmlElement $element, int $depth): string
     {
-        $href = self::safeHref((string) $element->getAttribute('href'));
+        $href = SafeUri::clean((string) $element->getAttribute('href'));
         $inner = self::children($element, $depth + 1);
 
         if ($href === null) {
@@ -218,30 +252,13 @@ final class RichHtml
         return '<span data-type="mention"'.$attributes.'>'.self::escapeText((string) $element->textContent).'</span>';
     }
 
-    private static function safeHref(string $href): ?string
-    {
-        $href = trim((string) preg_replace('/[\x00-\x1F\x7F-\x9F\x{200B}-\x{200D}\x{2028}\x{2029}\x{FEFF}]/u', '', $href));
-
-        if ($href === '') {
-            return null;
-        }
-
-        $probe = (string) preg_replace('/\s+/u', '', $href);
-
-        if (preg_match('/^([a-z][a-z0-9+.\-]*):/i', $probe, $matches) !== 1) {
-            return null;
-        }
-
-        return in_array(strtolower($matches[1]), self::ALLOWED_PROTOCOLS, true) ? $href : null;
-    }
-
     private static function escapeText(string $text): string
     {
-        return htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+        return str_replace("\u{00A0}", '&nbsp;', htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'));
     }
 
     private static function escapeAttribute(string $value): string
     {
-        return htmlspecialchars($value, ENT_COMPAT | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+        return str_replace("\u{00A0}", '&nbsp;', htmlspecialchars($value, ENT_COMPAT | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8'));
     }
 }

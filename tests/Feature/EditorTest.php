@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Fluent;
 use Illuminate\View\ViewException;
 use Livewire\Livewire;
 use Odden\Ui\Tests\Support\EditorComponent;
@@ -82,7 +83,7 @@ it('renders the full toolbar by default and ties it to the editable region', fun
         ->and($tools)->toBe(['bold', 'italic', 'link', 'bullet-list', 'ordered-list', 'heading-2', 'heading-3'])
         ->and($dom->querySelectorAll('[role=toolbar] button[tabindex="0"]'))->toHaveCount(1)
         ->and($dom->querySelector('[data-tool=bold]')->getAttribute('aria-label'))->toBe('Bold')
-        ->and($dom->querySelector('[data-tool=heading-2]')->getAttribute('aria-label'))->toBe('Heading 2')
+        ->and($dom->querySelector('[data-tool=heading-2]')->getAttribute('aria-label'))->toBe('H2 heading')
         ->and($dom->querySelector('[data-tool=heading-2]')->textContent)->toContain('H2');
 });
 
@@ -113,21 +114,14 @@ it('renders the inline link form with its own labelled input', function (): void
         ->and($dom->querySelector('[data-link-cancel]'))->not->toBeNull();
 });
 
-it('entangles the property and keeps wire:model off the markup', function (string $modifier, string $live, string $blur): void {
+it('keeps wire:model off the markup', function (string $modifier): void {
     $dom = Html::render("<x-ui::editor label=\"Body\" wire:model{$modifier}=\"body\" />");
-    $config = $dom->querySelector('[x-data]')->getAttribute('x-data');
 
-    expect($config)->toContain('$wire.$entangle(')
-        ->and($config)->toContain("body', {$live})")
-        ->and($config)->toContain(escapedForAttribute('"commitOnBlur":'.$blur))
+    expect($dom->querySelector('[x-data]')->getAttribute('x-data'))->toContain('$wire.$entangle(')
         ->and($dom->querySelector('[wire\:model]'))->toBeNull()
         ->and($dom->querySelector('[wire\:model\.live]'))->toBeNull()
         ->and($dom->querySelector('[wire\:model\.blur]'))->toBeNull();
-})->with([
-    'deferred' => ['', 'false', 'false'],
-    'live' => ['.live', 'true', 'false'],
-    'blur' => ['.blur', 'false', 'true'],
-]);
+})->with(['', '.live', '.blur']);
 
 it('passes the format, mentions and search method to the script', function (): void {
     $config = editorConfig('format="json" :mentions="[[\'id\' => 1, \'label\' => \'Ada\']]" mention-char="#"');
@@ -163,3 +157,68 @@ it('keeps the editable region out of Livewire morphing', function (): void {
 
     expect($dom->querySelector('[x-ref=host]')->parentNode->hasAttribute('wire:ignore'))->toBeTrue();
 });
+
+it('accepts a collection of mentions, models included', function (): void {
+    $users = collect([new Fluent(['id' => 1, 'label' => 'Ada']), ['id' => 2, 'label' => 'Grace']]);
+
+    $dom = Html::render('<x-ui::editor label="Body" name="body" :mentions="$users" />', ['users' => $users]);
+    $config = $dom->querySelector('[x-data]')->getAttribute('x-data');
+
+    expect($config)->toContain(escapedForAttribute('"mentions":[{"id":1,"label":"Ada"},{"id":2,"label":"Grace"}]'));
+});
+
+it('keeps an explicit id out of the JavaScript expressions', function (): void {
+    $dom = Html::render('<x-ui::editor id="x\'+alert(1)+\'" label="Body" name="body" :mentions="[]" />');
+
+    foreach ($dom->querySelectorAll('*') as $element) {
+        foreach ($element->attributes as $attribute) {
+            if ($attribute->name !== 'x-data' && (str_starts_with($attribute->name, 'x-') || str_starts_with($attribute->name, ':'))) {
+                expect($attribute->value)->not->toContain('alert(1)');
+            }
+        }
+    }
+
+    expect($dom->getElementById('x\'+alert(1)+\'-link-address'))->not->toBeNull()
+        ->and($dom->querySelector('[x-data]')->getAttribute('x-data'))->toContain('x'.chr(92).chr(92).'u0027+alert(1)+'.chr(92).chr(92).'u0027');
+});
+
+it('exposes the link button as a disclosure of the link form and the others as toggles', function (): void {
+    $dom = Html::render('<x-ui::editor label="Body" name="body" />');
+
+    $link = $dom->querySelector('[data-tool=link]');
+
+    expect($link->getAttribute('aria-controls'))->toBe('ui-body-link')
+        ->and($link->getAttribute('aria-expanded'))->toBe('false')
+        ->and($link->hasAttribute('aria-pressed'))->toBeFalse()
+        ->and($dom->getElementById('ui-body-link'))->not->toBeNull()
+        ->and($dom->querySelector('[data-tool=bold]')->getAttribute('aria-pressed'))->toBe('false')
+        ->and($dom->querySelector('[data-tool=bold]')->hasAttribute('aria-expanded'))->toBeFalse();
+});
+
+it('names the heading buttons so the accessible name contains the visible text', function (string $tool, string $visible): void {
+    $button = Html::render('<x-ui::editor label="Body" name="body" />')->querySelector("[data-tool={$tool}]");
+
+    expect($button->getAttribute('aria-label'))->toContain(trim($button->textContent))
+        ->and(trim($button->textContent))->toBe($visible);
+})->with([['heading-2', 'H2'], ['heading-3', 'H3']]);
+
+it('renders the unreadable-content message wired to the editor', function (): void {
+    $dom = Html::render('<x-ui::editor label="Body" name="body" />');
+
+    expect($dom->getElementById('ui-body-unreadable')->textContent)->toBe("This text has content the editor can't show, so it can't be edited here.")
+        ->and($dom->querySelector('[x-data]')->getAttribute('x-data'))->toContain(escapedForAttribute('"unreadableId":"ui-body-unreadable"'));
+});
+
+it('always deferred-entangles and commits through a debounce', function (string $modifier, string $expected): void {
+    $config = Html::render("<x-ui::editor label=\"Body\" wire:model{$modifier}=\"body\" />")->querySelector('[x-data]')->getAttribute('x-data');
+
+    expect($config)->toContain("body', false)")
+        ->and($config)->toContain(escapedForAttribute($expected));
+})->with([
+    'deferred' => ['', '"commit":{"live":false,"blur":false,"delay":150}'],
+    'live' => ['.live', '"commit":{"live":true,"blur":false,"delay":150}'],
+    'live debounce' => ['.live.debounce.500ms', '"commit":{"live":true,"blur":false,"delay":500}'],
+    'live debounce seconds' => ['.live.debounce.2s', '"commit":{"live":true,"blur":false,"delay":2000}'],
+    'blur' => ['.blur', '"commit":{"live":false,"blur":true,"delay":150}'],
+    'live blur' => ['.live.blur', '"commit":{"live":true,"blur":true,"delay":150}'],
+]);

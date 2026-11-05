@@ -51,6 +51,14 @@ class RecordTableComponent extends Component
         ];
     }
 
+    public function orderedSql(): string
+    {
+        $query = Fruit::query()->orderByDesc('price');
+        $this->applyRecordTable($query);
+
+        return $query->toRawSql();
+    }
+
     public function updatedSearch(): void
     {
         $this->searchUpdates++;

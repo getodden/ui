@@ -7,6 +7,8 @@ use Livewire\Livewire;
 use Odden\Ui\Tests\Support\CoexistingRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
+use Odden\Ui\Tests\Support\UnsortedRecordTableComponent;
+use Workbench\App\Models\Fruit;
 
 beforeEach(function (): void {
     RecordTableFixtures::install();
@@ -285,4 +287,56 @@ it('exposes the sort state for the table header', function (): void {
         'sort' => 'price',
         'direction' => 'desc',
     ]);
+});
+
+it('searches non-ASCII text on any database', function (string $term): void {
+    Fruit::query()->create(['name' => 'Émile', 'colour' => 'red', 'price' => 1]);
+
+    $component = Livewire::test(RecordTableComponent::class)->set('search', $term);
+
+    expect(fruitNames($component))->toBe(['Émile']);
+})->with(['Émile', 'mile']);
+
+it('lowers both sides of the search in the database', function (): void {
+    $component = Livewire::test(RecordTableComponent::class)->set('search', 'Ab');
+
+    expect($component->instance()->orderedSql())->toContain("lower(\"name\") like lower('%Ab%') escape '!'");
+});
+
+it('replaces the consumer order with the chosen sort and breaks ties on the key', function (): void {
+    $sql = Livewire::test(RecordTableComponent::class)->call('sortBy', 'price')->instance()->orderedSql();
+
+    expect($sql)->toContain('order by "price" asc, "fruits"."id" asc')->not->toContain('desc');
+});
+
+it('keeps the consumer order and appends the key tiebreak when nothing is sorted', function (): void {
+    $sql = Livewire::test(UnsortedRecordTableComponent::class)->instance()->orderedSql();
+
+    expect($sql)->toContain('order by "price" desc, "fruits"."id" asc');
+});
+
+it('pages deterministically without a sort', function (): void {
+    $component = Livewire::test(UnsortedRecordTableComponent::class)->set('perPage', 10)->call('gotoPage', 2);
+
+    expect(fruitNames($component)[0])->toBe('Date');
+});
+
+it('clamps a page past the end to the last page', function (): void {
+    $component = Livewire::withQueryParams(['page' => '99999'])->test(RecordTableComponent::class);
+
+    expect(fruitNames($component))->toBe(['Mango', 'Melon', 'Nectarine', 'Orange', 'Papaya', 'Peach', 'Pear', 'Pineapple', 'Plum', 'Raspberry'])->and($component->html())->toContain('page=3');
+});
+
+it('clamps a page past the end after the results shrink', function (): void {
+    $component = Livewire::test(RecordTableComponent::class)->call('gotoPage', 3);
+
+    $component->set('filters.colour', 'purple');
+
+    expect(fruitNames($component))->toBe(['Blackberry', 'Blueberry', 'Fig', 'Plum']);
+});
+
+it('shows a page past the end of no records as empty', function (): void {
+    $component = Livewire::withQueryParams(['page' => '5'])->test(RecordTableComponent::class)->set('search', 'zzzz');
+
+    expect(fruitNames($component))->toBe([])->and($component->html())->toContain('total=0');
 });

@@ -15,8 +15,8 @@ return [
         'link' => 'Link',
         'bullet_list' => 'Bulleted list',
         'ordered_list' => 'Numbered list',
-        'heading_2' => 'Heading 2',
-        'heading_3' => 'Heading 3',
+        'heading_2' => 'H2 heading',
+        'heading_3' => 'H3 heading',
         'link_address' => 'Link address',
         'link_apply' => 'Apply',
         'link_remove' => 'Remove link',
@@ -25,6 +25,7 @@ return [
         'suggestions' => 'Suggestions',
         'suggestions_count' => ':count suggestions available',
         'no_matches' => 'No matches',
+        'unreadable' => 'This text has content the editor can\'t show, so it can\'t be edited here.',
     ],
     'table' => [
         'empty' => 'No records found',

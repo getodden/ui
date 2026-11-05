@@ -26,14 +26,14 @@
     @endif
 
     <div role="status" class="sr-only">
-        <span wire:loading class="hidden">{{ __('ui::ui.table.loading') }}</span>
+        <span wire:loading wire:target="sortBy,resetFilters,search,sort,direction,filters,perPage,gotoPage,nextPage,previousPage,setPage" class="hidden">{{ __('ui::ui.table.loading') }}</span>
         @if ($paginator !== null && $paginator->total() > 0)
             <span>{{ __('ui::ui.table.showing', ['from' => $paginator->firstItem(), 'to' => $paginator->lastItem(), 'total' => $paginator->total()]) }}</span>
         @endif
     </div>
 
     <div class="relative overflow-x-auto rounded-surface border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100">
-        <table {{ $attributes->class(['w-full border-collapse text-start text-sm transition-opacity']) }} wire:loading.attr="aria-busy" wire:loading.delay.class="opacity-60">
+        <table {{ $attributes->class(['w-full border-collapse text-start text-sm transition-opacity']) }} wire:loading.attr="aria-busy" wire:loading.delay.class="opacity-60" wire:target="sortBy,resetFilters,search,sort,direction,filters,perPage,gotoPage,nextPage,previousPage,setPage">
             <caption @class(['px-4 py-3 text-start text-sm font-semibold', 'sr-only' => ! $captionVisible])>{{ $caption }}</caption>
             <thead class="border-b border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-700 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-300">
                 <tr>
@@ -78,7 +78,7 @@
             </tbody>
         </table>
 
-        <div wire:loading.delay.flex aria-hidden="true" class="pointer-events-none absolute inset-0 hidden items-center justify-center">
+        <div wire:loading.delay.flex wire:target="sortBy,resetFilters,search,sort,direction,filters,perPage,gotoPage,nextPage,previousPage,setPage" aria-hidden="true" class="pointer-events-none absolute inset-0 hidden items-center justify-center">
             <x-ui::icon name="fas-spinner" size="lg" class="animate-spin text-primary-700 dark:text-primary-400" />
         </div>
     </div>

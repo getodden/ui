@@ -44,7 +44,7 @@ it('sorts from the keyboard', function (): void {
 it('reaches the header buttons with Tab in reading order', function (): void {
     $page = visit('/');
 
-    $page->script('document.querySelector("#fruit-slow").focus()');
+    $page->script('document.querySelector("#fruit-unrelated").focus()');
     $page->keys(':focus', 'Tab')
         ->assertScript('document.activeElement.textContent.trim() === "Name"')
         ->keys(':focus', 'Tab')
@@ -126,7 +126,7 @@ it('marks the table busy and announces loading while a request runs', function (
     $page->script('window.busyLog = []; const table = document.querySelector("#fruit-table"); const message = table.closest("section").querySelector("[role=status] span"); new MutationObserver(() => window.busyLog.push([table.getAttribute("aria-busy"), getComputedStyle(message).display !== "none"])).observe(table, { attributes: true, attributeFilter: ["aria-busy"] })');
 
     $page->assertScript('document.querySelector("#fruit-table").getAttribute("aria-busy") === null')
-        ->click('#fruit-slow')
+        ->select('#fruit-per-page', '25')
         ->assertScript('window.busyLog.length === 2');
 
     expect($page->script('window.busyLog'))->toBe([['true', true], [null, false]]);
@@ -134,6 +134,36 @@ it('marks the table busy and announces loading while a request runs', function (
 
 it('has a polite status region from the start that reports the range', function (): void {
     visit('/')->assertScript('document.querySelector("#fruit-table").closest("section").querySelector("[role=status]").textContent.includes("Showing 1 to 10 of 30 results")');
+});
+
+it('keeps focus inside the pagination after activating a page and after reaching the last page', function (): void {
+    $page = visit('/');
+
+    $page->script('document.querySelector("[aria-label=\\"Go to page 2\\"]").focus()');
+    $page->keys(':focus', 'Enter')
+        ->assertScript('document.querySelector("nav[aria-label=Pagination] [aria-current=page]").textContent.includes("2")')
+        ->assertScript('document.querySelector("nav[aria-label=Pagination]").contains(document.activeElement)')
+        ->assertScript('document.activeElement.getAttribute("aria-current") === "page"');
+
+    $page->script('[...document.querySelectorAll("nav[aria-label=Pagination] button")].find((b) => b.textContent.trim() === "Next").focus()');
+    $page->keys(':focus', 'Enter')
+        ->assertScript('document.querySelector("nav[aria-label=Pagination] [aria-current=page]").textContent.includes("3")')
+        ->assertScript('document.querySelector("nav[aria-label=Pagination]").contains(document.activeElement)')
+        ->assertScript('document.activeElement.textContent.trim() === "Next" && document.activeElement.getAttribute("aria-disabled") === "true"');
+
+    $page->keys(':focus', 'Enter')
+        ->assertScript('document.querySelector("nav[aria-label=Pagination]").contains(document.activeElement)');
+});
+
+it('does not mark the table busy for an unrelated action in the component', function (): void {
+    $page = visit('/');
+
+    $page->script('window.busyLog = []; const table = document.querySelector("#fruit-table"); new MutationObserver(() => window.busyLog.push(table.getAttribute("aria-busy"))).observe(table, { attributes: true, attributeFilter: ["aria-busy"] })');
+
+    $page->click('#fruit-unrelated')
+        ->assertScript('document.querySelector("#fruit-unrelated-count").textContent === "1"');
+
+    expect($page->script('window.busyLog'))->toBe([]);
 });
 
 it('has no accessibility issues', function (): void {
