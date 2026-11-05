@@ -22,7 +22,7 @@
 
     $variantClasses = match ($variant) {
         'secondary' => 'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700',
-        'outline' => 'border border-gray-300 text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800',
+        'outline' => 'border border-gray-400 text-gray-900 hover:bg-gray-50 dark:border-gray-500 dark:text-gray-100 dark:hover:bg-gray-800',
         'ghost' => 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
         'danger' => 'bg-rose-700 text-white hover:bg-rose-800 dark:bg-rose-400 dark:text-gray-950 dark:hover:bg-rose-300',
         default => 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-400 dark:text-gray-950 dark:hover:bg-primary-300',
@@ -31,15 +31,26 @@
     $classes = "inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {$sizeClasses} {$variantClasses}";
 
     $tag = $href === null ? 'button' : 'a';
-    $loadingTarget = $attributes->get('wire:target') ?? $attributes->get('wire:click');
+    $disabledLink = $tag === 'a' && $disabled;
+
+    if ($disabledLink) {
+        $attributes = $attributes
+            ->whereDoesntStartWith('wire:click')
+            ->whereDoesntStartWith('x-on:click')
+            ->whereDoesntStartWith('@click');
+    }
+
+    $clickExpression = $attributes->whereStartsWith('wire:click')->first();
+    $clickedMethod = is_string($clickExpression) && preg_match('/^\s*([A-Za-z_$][\w$.]*)/', $clickExpression, $matches) === 1 ? $matches[1] : null;
+    $loadingTarget = $attributes->get('wire:target') ?? $clickedMethod;
 
     $elementAttributes = $attributes->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
         'disabled' => $tag === 'button' && $disabled ? true : null,
         'href' => $tag === 'a' && ! $disabled ? $href : null,
-        'role' => $tag === 'a' && $disabled ? 'link' : null,
-        'tabindex' => $tag === 'a' && $disabled ? '-1' : null,
-        'aria-disabled' => $tag === 'a' && $disabled ? 'true' : null,
+        'role' => $disabledLink ? 'link' : null,
+        'tabindex' => $disabledLink ? '-1' : null,
+        'aria-disabled' => $disabledLink ? 'true' : null,
         'aria-label' => $iconOnly ? $label : null,
         'wire:target' => $loadingTarget,
         'wire:loading.attr' => $loadingTarget ? 'aria-busy' : null,

@@ -1,10 +1,17 @@
+@props(['duration' => 5000])
+
 <div
     role="status"
     aria-live="polite"
+    aria-atomic="false"
+    tabindex="-1"
     x-data="{
         toasts: @js(\Odden\Ui\Support\Toasts::flashed()),
+        timers: {},
         counter: 0,
+        root: null,
         init() {
+            this.root = this.$el
             const initial = this.toasts
             this.toasts = []
             initial.forEach((toast) => this.add(toast))
@@ -12,19 +19,53 @@
         add(toast) {
             const id = ++this.counter
             this.toasts.push({ id, message: toast.message, variant: toast.variant ?? 'success' })
-            if (toast.variant !== 'danger') {
-                setTimeout(() => this.dismiss(id), 5000)
-            }
+            this.schedule(id)
+        },
+        schedule(id) {
+            const toast = this.toasts.find((candidate) => candidate.id === id)
+            if (!toast || toast.variant === 'danger' || this.timers[id] || this.interacting()) return
+            this.timers[id] = setTimeout(() => this.dismiss(id), {{ (int) $duration }})
+        },
+        interacting() {
+            return this.root.matches(':hover') || this.root.contains(document.activeElement)
+        },
+        pause() {
+            Object.values(this.timers).forEach(clearTimeout)
+            this.timers = {}
+        },
+        resume() {
+            this.toasts.forEach((toast) => this.schedule(toast.id))
+        },
+        resumeSoon() {
+            setTimeout(() => this.resume(), 0)
         },
         dismiss(id) {
+            clearTimeout(this.timers[id])
+            delete this.timers[id]
+            const index = this.toasts.findIndex((toast) => toast.id === id)
+            const element = this.root.querySelector(`[data-toast-id='${id}']`)
+            const hadFocus = element?.contains(document.activeElement)
             this.toasts = this.toasts.filter((toast) => toast.id !== id)
+            if (hadFocus) {
+                this.$nextTick(() => {
+                    const buttons = this.root.querySelectorAll('[data-toast-id] button')
+                    const target = buttons[Math.min(Math.max(index - 1, 0), buttons.length - 1)] ?? this.root
+                    target.focus()
+                })
+            }
+            this.resumeSoon()
         },
     }"
     x-on:ui-toast.window="add($event.detail)"
-    {{ $attributes->class(['pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-end gap-2 p-4']) }}
+    x-on:mouseenter="pause()"
+    x-on:mouseleave="resumeSoon()"
+    x-on:focusin="pause()"
+    x-on:focusout="resumeSoon()"
+    {{ $attributes->class(['pointer-events-none fixed outline-none inset-x-0 bottom-0 z-50 flex flex-col items-end gap-2 p-4']) }}
 >
     <template x-for="toast in toasts" :key="toast.id">
         <div
+            :data-toast-id="toast.id"
             class="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-surface border bg-white p-4 text-sm text-gray-900 shadow-lg dark:bg-gray-900 dark:text-gray-100"
             :class="{
                 'border-emerald-200 dark:border-emerald-900': toast.variant === 'success',

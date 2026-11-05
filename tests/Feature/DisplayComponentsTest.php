@@ -66,18 +66,33 @@ it('shows a busy spinner for the livewire action it triggers', function (): void
         ->and($button->querySelector('svg')->getAttribute('wire:target'))->toBe('save');
 });
 
-it('keeps the primary fill readable on both themes', function (): void {
-    $class = Html::render('<x-ui::button>Go</x-ui::button>')->querySelector('button')->getAttribute('class');
+it('keeps the busy target when the click arguments hold special characters', function (): void {
+    $button = Html::render('<x-ui::button wire:click.prevent="remove(\'a&b <c> &quot;d\')">Remove</x-ui::button>')->querySelector('button');
 
-    expect($class)->toContain('bg-primary-700')->toContain('text-white')
-        ->toContain('dark:bg-primary-400')->toContain('dark:text-gray-950')
-        ->toContain('dark:hover:bg-primary-300');
+    expect($button->getAttribute('wire:target'))->toBe('remove')
+        ->and($button->getAttribute('wire:loading.attr'))->toBe('aria-busy')
+        ->and($button->getAttribute('wire:click.prevent'))->toBe('remove(\'a&b <c> "d\')')
+        ->and($button->querySelector('svg')->getAttribute('wire:target'))->toBe('remove');
 });
 
-it('keeps the danger fill readable on both themes', function (): void {
-    $class = Html::render('<x-ui::button variant="danger">Go</x-ui::button>')->querySelector('button')->getAttribute('class');
+it('drops every click handler from a disabled link', function (): void {
+    $link = Html::render('<x-ui::button href="/billing" disabled wire:click="go" wire:click.prevent="stop" x-on:click="open = true" @click="other()">Billing</x-ui::button>')->querySelector('a');
 
-    expect($class)->toContain('bg-rose-700')->toContain('dark:bg-rose-400')->toContain('dark:text-gray-950');
+    foreach ($link->attributes as $attribute) {
+        expect($attribute->name)->not->toStartWith('wire:click')
+            ->not->toStartWith('x-on:click')
+            ->not->toStartWith('@click');
+    }
+
+    expect($link->getAttribute('aria-disabled'))->toBe('true')
+        ->and($link->hasAttribute('wire:target'))->toBeFalse();
+});
+
+it('keeps the click handlers on an enabled link', function (): void {
+    $link = Html::render('<x-ui::button href="/billing" x-on:click="open = true">Billing</x-ui::button>')->querySelector('a');
+
+    expect($link->getAttribute('x-on:click'))->toBe('open = true')
+        ->and($link->getAttribute('href'))->toBe('/billing');
 });
 
 it('renders a badge with an icon', function (): void {
@@ -162,6 +177,28 @@ it('labels the modal dialog by its heading and describes it', function (): void 
         ->and($dialog->textContent)->toContain('Footer');
 });
 
+it('gives two modals whose names differ only in case or punctuation different ids', function (): void {
+    $dom = Html::render('<x-ui::modal name="Edit User" heading="One">A</x-ui::modal><x-ui::modal name="edit-user" heading="Two">B</x-ui::modal>');
+
+    $labelledBy = array_map(fn ($dialog): string => $dialog->getAttribute('aria-labelledby'), iterator_to_array($dom->querySelectorAll('[role=dialog]')));
+
+    expect($labelledBy)->toHaveCount(2)
+        ->and($labelledBy[0])->not->toBe($labelledBy[1])
+        ->and($dom->getElementById($labelledBy[0])->textContent)->toBe('One')
+        ->and($dom->getElementById($labelledBy[1])->textContent)->toBe('Two');
+});
+
+it('refuses a modal without a heading', function (): void {
+    Html::render('<x-ui::modal name="edit">Body</x-ui::modal>');
+})->throws(ViewException::class, 'needs a heading');
+
+it('lets the modal close itself on Escape only when focus is inside it', function (): void {
+    $dom = Html::render('<x-ui::modal name="edit" heading="Edit">Body</x-ui::modal>');
+
+    expect($dom->querySelector('[x-data]')->hasAttribute('x-on:keydown.escape.window'))->toBeFalse()
+        ->and($dom->querySelector('[role=dialog]')->getAttribute('x-on:keydown.escape.stop'))->toBe('open = false');
+});
+
 it('describes the modal only when it has a description', function (): void {
     $dialog = Html::render('<x-ui::modal name="edit" heading="Edit">Body</x-ui::modal>')->querySelector('[role=dialog]');
 
@@ -179,6 +216,7 @@ it('renders the toasts live region in the page from the start', function (): voi
     $region = Html::render('<x-ui::toasts />')->querySelector('[aria-live]');
 
     expect($region->getAttribute('aria-live'))->toBe('polite')
+        ->and($region->getAttribute('aria-atomic'))->toBe('false')
         ->and($region->getAttribute('role'))->toBe('status')
         ->and($region->getAttribute('x-on:ui-toast.window'))->not->toBeNull();
 });

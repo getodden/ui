@@ -1,14 +1,8 @@
 @props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'required' => false])
 
 @php
-    $field = \Odden\Ui\Support\FieldState::resolve($attributes, $name, $id, $error, filled($hint), $errors ?? null);
-    $controlAttributes = $attributes->merge(array_filter([
-        'id' => $field->id,
-        'name' => $field->name,
-        'aria-describedby' => $field->describedBy,
-        'aria-invalid' => $field->error === null ? null : 'true',
-        'required' => $required ? true : null,
-    ], fn ($value) => $value !== null))->class(['peer absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed']);
+    $field = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null);
+    $controlAttributes = $field->controlAttributes($attributes, $required)->class(['peer absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed']);
 @endphp
 
 <x-ui::field :id="$field->id" :label="$label" :hint="$hint" :error="$field->error" :required="$required" inline>

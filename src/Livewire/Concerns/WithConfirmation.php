@@ -23,7 +23,7 @@ trait WithConfirmation
     /**
      * @param  array<int|string, mixed>  $arguments
      */
-    public function confirm(
+    protected function confirm(
         string $action,
         array $arguments,
         string $title,
@@ -66,15 +66,25 @@ trait WithConfirmation
 
     private function assertConfirmable(string $action): void
     {
+        if (self::isReserved($action)) {
+            throw new InvalidArgumentException("[{$action}] cannot be confirmed.");
+        }
+
         if (! method_exists($this, $action)) {
             throw new InvalidArgumentException("[{$action}] is not a method on ".static::class.'.');
         }
 
         $declaringClass = (new ReflectionMethod($this, $action))->getDeclaringClass()->getName();
 
-        if (str_starts_with($declaringClass, 'Livewire\\')
-            || in_array($action, ['confirm', 'runConfirmation', 'cancelConfirmation', 'updatedConfirming'], true)) {
+        if (str_starts_with($declaringClass, 'Livewire\\')) {
             throw new InvalidArgumentException("[{$action}] cannot be confirmed.");
         }
+    }
+
+    private static function isReserved(string $action): bool
+    {
+        return in_array($action, ['confirm', 'runConfirmation', 'cancelConfirmation'], true)
+            || preg_match('/^(mount|boot|hydrate|dehydrate|updating|updated)/i', $action) === 1
+            || in_array(strtolower($action), ['render', 'rendering', 'rendered', 'exception'], true);
     }
 }

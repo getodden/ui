@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Odden\Ui\Tests\Support\ConfirmingComponent;
@@ -54,7 +55,20 @@ it('cancels when the dialog is closed in the browser', function (): void {
 it('cannot reach the protected action without confirming', function (): void {
     Livewire::test(ConfirmingComponent::class)
         ->call('remove', 7);
-})->throws(Exception::class);
+})->throws(MethodNotFoundException::class);
+
+it('cannot be asked to confirm from the browser', function (): void {
+    Livewire::test(ConfirmingComponent::class)
+        ->call('confirm', 'remove', [999], 'Remove it?', 'Gone for good.', 'Remove');
+})->throws(MethodNotFoundException::class);
+
+it('refuses to confirm a lifecycle method', function (string $action): void {
+    Livewire::test(ConfirmingComponent::class)
+        ->call('askToDoSomethingElse', $action);
+})->throws(InvalidArgumentException::class, 'cannot be confirmed')->with([
+    'mount', 'mountExtras', 'boot', 'bootExtras', 'hydrate', 'hydrateExtras', 'dehydrate', 'dehydrateExtras',
+    'updating', 'updatingExtras', 'updated', 'updatedExtras', 'updatedConfirming', 'render', 'rendering', 'rendered', 'exception',
+]);
 
 it('rejects a tampered action from the browser', function (): void {
     Livewire::test(ConfirmingComponent::class)

@@ -9,6 +9,6 @@
     <main>
         {{ $slot }}
     </main>
-    <x-ui::toasts />
+    <x-ui::toasts :duration="1500" />
 </body>
 </html>

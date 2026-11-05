@@ -19,7 +19,7 @@ final class Demo extends Component
 
     public string $name = '';
 
-    public string $plan = 'growth';
+    public string $plan = 'medium';
 
     public string $notes = '';
 
@@ -35,6 +35,12 @@ final class Demo extends Component
 
         $this->showEdit = false;
         $this->toast('Saved');
+    }
+
+    public function saveAndLeave(): void
+    {
+        $this->toastAfterRedirect('Saved for later', ToastVariant::Info);
+        $this->redirect('/');
     }
 
     public function warn(): void

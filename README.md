@@ -2,7 +2,7 @@
 
 Accessible Blade components, Livewire traits and Tailwind 4 theme tokens for Laravel Livewire screens.
 
-Status: **0.1.** Pre-1.0, so a minor version may still change the API. It is the UI layer behind the screens of [Odden Cloud](https://odden.io), and it knows nothing about tenancy, CRMs or any host application.
+Status: **0.1.** Pre-1.0, so a minor version may still change the API. It is the UI layer behind the Odden Livewire screens, and it knows nothing about CRMs or any host application.
 
 ## Install
 
@@ -33,10 +33,10 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::badge>` | `variant` gray, primary, success, warning, danger, info; `icon` |
 | `<x-ui::card>` | `heading` (prop or slot); `level` (default 2); `footer` slot |
 | `<x-ui::alert>` | `variant` info, success, warning, danger; `heading`; `icon`; `dismissible` |
-| `<x-ui::modal>` | `name`; `heading`; `description`; `size` sm, md, lg, xl; `footer` slot; `wire:model` |
+| `<x-ui::modal>` | `name`; `heading` (required, it names the dialog); `description`; `size` sm, md, lg, xl; `footer` slot; `wire:model` |
 | `<x-ui::confirm>` | `confirmation` (the `$confirmation` property of `WithConfirmation`) |
-| `<x-ui::toasts>` | none |
-| `<x-ui::input>` | `label`, `name`, `id`, `hint`, `error`, `required`, `type` |
+| `<x-ui::toasts>` | `duration` in milliseconds before a non-danger toast leaves (default 5000) |
+| `<x-ui::input>` | `label` (required unless you pass `aria-label` or `aria-labelledby`), `name`, `id`, `hint`, `error`, `required`, `type` |
 | `<x-ui::textarea>` | the field props, `rows` |
 | `<x-ui::select>` | the field props, `options` (value => label), `placeholder`, `value`, and a slot |
 | `<x-ui::toggle>` | the field props; renders a switch |
@@ -47,6 +47,8 @@ Components that take an `icon` accept a Blade FontAwesome name as a string, or a
 ### Fields
 
 `name` is taken from `wire:model*` when you do not pass it, and `id` from `name` (`address[city]` becomes `ui-address-city`). The error is read from the `$errors` bag by the same key when you do not pass `error`.
+
+Two fields bound to the same key on one page get the same id, so give one of them an explicit `id`. An `aria-describedby` you pass is appended to the hint and error ids, not substituted for them. A field without a `label` throws unless it has an `aria-label` or `aria-labelledby`.
 
 ```blade
 <x-ui::input label="Email" wire:model.blur="form.email" hint="We never share it" required />
@@ -61,11 +63,11 @@ Components that take an `icon` accept a Blade FontAwesome name as a string, or a
 <x-ui::button x-on:click="$dispatch('ui-modal-open', { name: 'invite' })">Invite</x-ui::button>
 ```
 
-The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first control.
+The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first focusable element. Escape closes only the modal that holds focus, so a modal opened from inside another closes first. A modal without a `heading` throws.
 
 ## Livewire traits
 
-`WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds.
+`WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds, and hovering or focusing the toasts holds them.
 
 `WithConfirmation` asks before a destructive action and keeps what was asked in a `#[Locked]` property, so the browser cannot change which method runs or with what arguments. The confirmed method may be `protected`, so confirming is the only way to reach it.
 
@@ -91,7 +93,7 @@ class Contacts extends Component
 <x-ui::confirm :confirmation="$confirmation" />
 ```
 
-`confirm()` refuses a name that is not a method on the component, and the framework's own methods. Closing the dialog cancels the confirmation. Focus starts on Cancel for a danger confirmation and on the confirm button otherwise.
+`confirm()` is protected, so only your own methods can call it. It refuses a name that is not a method on the component, the framework's own methods and lifecycle names such as `mount*`, `boot*`, `updated*` and `render`. Closing the dialog cancels the confirmation. Focus starts on Cancel for a danger confirmation and on the confirm button otherwise.
 
 ## Accessibility
 
@@ -99,6 +101,7 @@ class Contacts extends Component
 - Fields render a `label` for the control, a hint and an error with ids, `aria-describedby` listing only what is rendered, `aria-invalid` only with an error, and an `aria-hidden` required mark beside the `required` attribute.
 - Modals are `role="dialog"` with `aria-modal`, `aria-labelledby` and optional `aria-describedby`; focus is trapped, Escape and the backdrop close them, body scroll is locked and focus returns to the opener.
 - The toast region is `aria-live="polite"` and is in the page from the start. Danger and warning alerts use `role="alert"`, the others `role="status"`.
+- Control borders (inputs, selects, textareas, outline buttons) meet the 3:1 non-text contrast of WCAG 1.4.11. A disabled link button has no `href` and no click handlers.
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
 
 ## Development

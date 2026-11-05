@@ -8,6 +8,7 @@ use Illuminate\Support\MessageBag;
 use Illuminate\Support\Str;
 use Illuminate\Support\ViewErrorBag;
 use Illuminate\View\ComponentAttributeBag;
+use InvalidArgumentException;
 
 final readonly class FieldState
 {
@@ -20,12 +21,17 @@ final readonly class FieldState
 
     public static function resolve(
         ComponentAttributeBag $attributes,
+        ?string $label,
         ?string $name,
         ?string $id,
         ?string $error,
         bool $hasHint,
         mixed $errors,
     ): self {
+        if (blank($label) && ! $attributes->has('aria-label') && ! $attributes->has('aria-labelledby')) {
+            throw new InvalidArgumentException('A ui field needs a label, an aria-label or an aria-labelledby.');
+        }
+
         $wireModel = $attributes->whereStartsWith('wire:model')->first();
         $wireModel = is_string($wireModel) && $wireModel !== '' ? $wireModel : null;
 
@@ -36,9 +42,21 @@ final readonly class FieldState
         $describedBy = array_filter([
             $hasHint ? $id.'-hint' : null,
             $error !== null ? $id.'-error' : null,
+            $attributes->get('aria-describedby'),
         ]);
 
         return new self($name, $id, $error, $describedBy === [] ? null : implode(' ', $describedBy));
+    }
+
+    public function controlAttributes(ComponentAttributeBag $attributes, bool $required): ComponentAttributeBag
+    {
+        return $attributes->except('aria-describedby')->merge(array_filter([
+            'id' => $this->id,
+            'name' => $this->name,
+            'aria-describedby' => $this->describedBy,
+            'aria-invalid' => $this->error === null ? null : 'true',
+            'required' => $required ? true : null,
+        ], fn (string|bool|null $value): bool => $value !== null));
     }
 
     private static function idFromName(?string $name): string

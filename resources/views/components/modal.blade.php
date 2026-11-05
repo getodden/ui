@@ -1,8 +1,9 @@
 @props(['name' => null, 'heading' => null, 'description' => null, 'size' => 'lg'])
 
 @php
-    $key = $name ?? \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
-    $baseId = 'ui-modal-'.\Illuminate\Support\Str::slug($key);
+    throw_if(blank($heading), \InvalidArgumentException::class, 'A ui::modal needs a heading.');
+
+    $baseId = 'ui-modal-'.($name === null ? \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8)) : substr(sha1($name), 0, 12));
     $hasDescription = filled($description);
     $hasFooter = isset($footer) && filled(trim((string) $footer));
 
@@ -19,14 +20,14 @@
     x-modelable="open"
     x-on:ui-modal-open.window="if (name !== null && $event.detail?.name === name) open = true"
     x-on:ui-modal-close.window="if (name !== null && $event.detail?.name === name) open = false"
-    x-on:keydown.escape.window="open = false"
-    x-effect="open && setTimeout(() => $refs.dialog.querySelector('[data-autofocus]')?.focus(), 50)"
     {{ $attributes }}
 >
     <div
         x-ref="dialog"
         x-show="open"
-        x-trap.noscroll="open"
+        x-effect="if (open) { $refs.dialog.uiOpener = document.activeElement; setTimeout(() => open && ($refs.dialog.querySelector('[data-autofocus]') ? $refs.dialog.querySelector('[data-autofocus]').focus() : $focus.within($refs.dialog).first()), 25) } else if ($refs.dialog.uiOpener) { const opener = $refs.dialog.uiOpener; $refs.dialog.uiOpener = null; $nextTick(() => opener.isConnected && opener.focus()) }"
+        x-trap.noscroll.noautofocus.noreturn="open"
+        x-on:keydown.escape.stop="open = false"
         style="display: none"
         role="dialog"
         aria-modal="true"

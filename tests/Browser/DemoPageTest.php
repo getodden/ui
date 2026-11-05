@@ -2,33 +2,43 @@
 
 declare(strict_types=1);
 
-const EDIT_DIALOG = '[aria-labelledby="ui-modal-edit-heading"]';
-const EDIT_DIALOG_CLOSED = 'getComputedStyle(document.querySelector(\'[aria-labelledby="ui-modal-edit-heading"]\')).display === "none"';
+const EDIT_DIALOG = '#edit-modal [role=dialog]';
+const DETAILS_DIALOG = '#details-modal [role=dialog]';
+
+function dialogIsClosed(string $selector): string
+{
+    return 'getComputedStyle(document.querySelector(\''.$selector.'\')).display === "none"';
+}
+
+function focusIsInside(string $selector): string
+{
+    return 'document.querySelector(\''.$selector.'\').contains(document.activeElement)';
+}
 
 it('opens and closes the modal and returns focus to its opener', function (): void {
     $page = visit('/');
 
     $page->assertNoJavaScriptErrors()
-        ->assertScript(EDIT_DIALOG_CLOSED)
+        ->assertScript(dialogIsClosed(EDIT_DIALOG))
         ->click('#open-edit')
         ->assertVisible(EDIT_DIALOG)
         ->assertSee('Edit account')
+        ->assertScript(focusIsInside(EDIT_DIALOG))
         ->keys(':focus', 'Escape')
-        ->assertScript(EDIT_DIALOG_CLOSED);
-
-    usleep(200_000);
-
-    expect($page->script('document.activeElement.id'))->toBe('open-edit');
+        ->assertScript(dialogIsClosed(EDIT_DIALOG))
+        ->assertScript('document.activeElement.id === "open-edit"');
 });
 
-it('keeps focus inside the open modal', function (): void {
+it('moves focus into the modal exactly once, onto the first focusable element', function (): void {
     $page = visit('/');
 
-    $page->click('#open-edit')->assertVisible(EDIT_DIALOG);
+    $page->script('window.focusLog = []; document.addEventListener("focusin", (event) => window.focusLog.push(event.target.getAttribute("aria-label") ?? event.target.id))');
 
-    usleep(300_000);
+    $page->click('#open-edit')->assertVisible(EDIT_DIALOG)->assertScript(focusIsInside(EDIT_DIALOG));
 
-    expect($page->script('document.querySelector(\''.EDIT_DIALOG.'\').contains(document.activeElement)'))->toBeTrue();
+    $log = $page->script('new Promise((resolve) => setTimeout(() => resolve(window.focusLog), 200))');
+
+    expect($log)->toBe(['open-edit', 'Close']);
 });
 
 it('closes the modal from the backdrop and from the close button', function (): void {
@@ -36,12 +46,27 @@ it('closes the modal from the backdrop and from the close button', function (): 
 
     $page->click('#open-edit')->assertVisible(EDIT_DIALOG)
         ->click(EDIT_DIALOG.' [aria-label="Close"]')
-        ->assertScript(EDIT_DIALOG_CLOSED)
+        ->assertScript(dialogIsClosed(EDIT_DIALOG))
         ->click('#open-edit')->assertVisible(EDIT_DIALOG);
 
     $page->script('document.querySelector(\''.EDIT_DIALOG.' > [aria-hidden=true]\').click()');
 
-    $page->assertScript(EDIT_DIALOG_CLOSED);
+    $page->assertScript(dialogIsClosed(EDIT_DIALOG));
+});
+
+it('closes only the top modal on Escape and keeps focus in the one beneath', function (): void {
+    $page = visit('/');
+
+    $page->click('#open-edit')->assertVisible(EDIT_DIALOG)
+        ->click('#open-details')->assertVisible(DETAILS_DIALOG)
+        ->assertScript(focusIsInside(DETAILS_DIALOG))
+        ->keys(':focus', 'Escape')
+        ->assertScript(dialogIsClosed(DETAILS_DIALOG))
+        ->assertVisible(EDIT_DIALOG)
+        ->assertScript(focusIsInside(EDIT_DIALOG))
+        ->assertScript('document.activeElement.id === "open-details"')
+        ->keys(':focus', 'Escape')
+        ->assertScript(dialogIsClosed(EDIT_DIALOG));
 });
 
 it('shows a toast from the server and lets the visitor dismiss it', function (): void {
@@ -52,14 +77,44 @@ it('shows a toast from the server and lets the visitor dismiss it', function ():
         ->assertDontSee('Careful now');
 });
 
+it('holds a toast while the pointer is over it and lets it go afterwards', function (): void {
+    $page = visit('/');
+
+    $page->click('#warn')->assertSee('Careful now')->hover('[data-toast-id]');
+
+    $stillThere = $page->script('new Promise((resolve) => setTimeout(() => resolve(document.querySelector("[data-toast-id]") !== null), 2200))');
+
+    expect($stillThere)->toBeTrue();
+
+    $page->hover('#open-edit')->assertDontSee('Careful now');
+});
+
+it('moves focus to the previous toast when the focused one is dismissed', function (): void {
+    $page = visit('/');
+
+    $page->click('#warn')->assertSee('Careful now')
+        ->click('#warn')
+        ->assertScript('document.querySelectorAll("[data-toast-id]").length === 2');
+
+    $page->script('document.querySelectorAll("[data-toast-id] button")[1].focus()');
+    $page->keys(':focus', 'Enter')
+        ->assertScript('document.querySelectorAll("[data-toast-id]").length === 1')
+        ->assertScript('document.activeElement.closest("[data-toast-id]") !== null');
+});
+
+it('shows a toast flashed before a redirect on the next page', function (): void {
+    visit('/')
+        ->click('#leave')
+        ->assertSee('Saved for later')
+        ->assertScript('document.querySelector("[aria-live]").textContent.includes("Saved for later")');
+});
+
 it('asks for confirmation, focuses cancel on a danger confirmation and runs the action', function (): void {
     $page = visit('/');
 
-    $page->click('#delete')->assertSee('Delete this item?');
-
-    usleep(300_000);
-
-    expect($page->script('document.activeElement.textContent.trim()'))->toBe('Cancel');
+    $page->click('#delete')
+        ->assertSee('Delete this item?')
+        ->assertScript('document.activeElement.textContent.trim() === "Cancel"');
 
     $page->click('Delete item')
         ->assertSee('Deleted item 7')
@@ -69,13 +124,12 @@ it('asks for confirmation, focuses cancel on a danger confirmation and runs the 
 it('drops the pending confirmation when it is dismissed', function (): void {
     $page = visit('/');
 
-    $page->click('#delete')->assertSee('Delete this item?')->keys(':focus', 'Escape');
-
-    usleep(500_000);
-
-    expect($page->script('document.activeElement.id'))->toBe('delete');
-
-    $page->assertDontSee('Deleted item 7');
+    $page->click('#delete')->assertSee('Delete this item?')
+        ->assertScript('document.activeElement.textContent.trim() === "Cancel"')
+        ->keys(':focus', 'Escape')
+        ->assertDontSee('Delete this item?')
+        ->assertScript('document.activeElement.id === "delete"')
+        ->assertDontSee('Deleted item 7');
 });
 
 it('has no accessibility issues', function (): void {

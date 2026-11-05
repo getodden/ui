@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Dom\Element;
+use Illuminate\View\ViewException;
 use Odden\Ui\Tests\Support\Html;
 
 function describedBy(Element $control): array
@@ -54,6 +55,29 @@ it('describes the control by exactly the hint and error that are rendered', func
     'error only' => ['error="Too short"', ['error']],
     'both' => ['hint="Shown on invoices" error="Too short"', ['hint', 'error']],
 ]);
+
+it('appends a given aria-describedby to the hint and error ids', function (): void {
+    $dom = Html::render('<x-ui::input label="Name" name="name" hint="Shown" error="Short" aria-describedby="extra-help" />');
+
+    expect(describedBy($dom->querySelector('input')))->toBe(['ui-name-hint', 'ui-name-error', 'extra-help']);
+});
+
+it('keeps a given aria-describedby when there is no hint or error', function (): void {
+    $dom = Html::render('<x-ui::input label="Name" name="name" aria-describedby="extra-help" />');
+
+    expect(describedBy($dom->querySelector('input')))->toBe(['extra-help']);
+});
+
+it('refuses a field without a label', function (string $component): void {
+    Html::render("<{$component} name=\"name\" />");
+})->throws(ViewException::class, 'needs a label')->with(['x-ui::input', 'x-ui::select', 'x-ui::textarea', 'x-ui::toggle']);
+
+it('accepts a field named by aria-label or aria-labelledby instead of a label', function (string $attribute): void {
+    $dom = Html::render("<x-ui::input name=\"search\" {$attribute}=\"Search\" />");
+
+    expect($dom->querySelector('input')->getAttribute($attribute))->toBe('Search')
+        ->and($dom->querySelector('label'))->toBeNull();
+})->with(['aria-label', 'aria-labelledby']);
 
 it('marks the control invalid only when there is an error', function (): void {
     $valid = Html::render('<x-ui::input label="Name" name="name" />')->querySelector('input');
