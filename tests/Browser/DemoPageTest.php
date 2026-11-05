@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-const EDIT_DIALOG = '#edit-modal [role=dialog]';
-const DETAILS_DIALOG = '#details-modal [role=dialog]';
+const EDIT_DIALOG = '[data-ui-modal=edit]';
+const DETAILS_DIALOG = '[data-ui-modal=details]';
 
 function dialogIsClosed(string $selector): string
 {
@@ -138,4 +138,60 @@ it('has no accessibility issues', function (): void {
 
 it('has no accessibility issues while the modal is open', function (): void {
     visit('/')->click('#open-edit')->assertVisible(EDIT_DIALOG)->assertNoAccessibilityIssues();
+});
+
+it('returns focus to the opener when a server action removes an open modal', function (): void {
+    $page = visit('/');
+
+    $page->click('#open-server')
+        ->assertVisible('[role=dialog]:has(#close-server)')
+        ->assertScript('document.querySelector("[role=dialog]:has(#close-server)").contains(document.activeElement)');
+
+    $page->click('#close-server')
+        ->assertScript('document.querySelector("#close-server") === null')
+        ->assertScript('document.activeElement.id === "open-server"');
+});
+
+it('puts a confirmation declared earlier in the DOM on top of the modal that opens it', function (): void {
+    $page = visit('/');
+
+    $page->click('#open-edit')->assertVisible(EDIT_DIALOG)
+        ->click('#delete-in-modal')
+        ->assertSee('Delete this item?');
+
+    $page->assertScript('(() => { const dialog = document.querySelector("[role=dialog]:has(button[data-autofocus])"); const box = dialog.querySelector("h2").getBoundingClientRect(); const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return dialog.contains(top) })()')
+        ->assertScript('document.activeElement.textContent.trim() === "Cancel"');
+});
+
+it('marks only the clicked button busy while its action runs', function (): void {
+    $page = visit('/');
+
+    $page->script('window.busyLog = []; new MutationObserver(() => window.busyLog.push([...document.querySelectorAll("[aria-busy=true]")].map((element) => element.id))).observe(document.body, { attributes: true, attributeFilter: ["aria-busy"], subtree: true })');
+
+    $page->click('#delete-a');
+
+    $busy = $page->script('new Promise((resolve) => setTimeout(() => resolve(window.busyLog), 1200))');
+
+    expect($busy)->not->toBeEmpty()
+        ->and(collect($busy)->flatten()->unique()->values()->all())->toBe(['delete-a']);
+});
+
+it('moves focus to the next focusable element when a focused alert is dismissed', function (): void {
+    $page = visit('/');
+
+    $page->script('document.querySelector("#second-alert button").focus()');
+
+    $page->keys(':focus', 'Enter')
+        ->assertScript('getComputedStyle(document.querySelector("#second-alert")).display === "none"')
+        ->assertScript('document.activeElement.id === "after-alerts"');
+});
+
+it('moves focus to the parent region when a dismissed alert has nothing focusable after it', function (): void {
+    $page = visit('/');
+
+    $page->script('(() => { const alert = document.querySelector("#second-alert"); while (alert.nextElementSibling) { alert.nextElementSibling.remove() } alert.querySelector("button").focus() })()');
+
+    $page->keys(':focus', 'Enter')
+        ->assertScript('getComputedStyle(document.querySelector("#second-alert")).display === "none"')
+        ->assertScript('document.activeElement === document.querySelector("#second-alert").parentElement');
 });

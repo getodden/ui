@@ -12,7 +12,7 @@ final class ConfirmingComponent extends Component
     use WithConfirmation;
 
     /**
-     * @var list<int>
+     * @var list<int|string>
      */
     public array $removed = [];
 
@@ -29,6 +29,26 @@ final class ConfirmingComponent extends Component
     protected function remove(int $id): void
     {
         $this->removed[] = $id;
+    }
+
+    protected function bootstrapWorkspace(): void
+    {
+        $this->removed[] = 'bootstrapWorkspace';
+    }
+
+    protected function mountVolume(): void
+    {
+        $this->removed[] = 'mountVolume';
+    }
+
+    protected function renderPdf(): void
+    {
+        $this->removed[] = 'renderPdf';
+    }
+
+    protected function exceptional(): void
+    {
+        $this->removed[] = 'exceptional';
     }
 
     public function render(): string

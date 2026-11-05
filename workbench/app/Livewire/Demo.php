@@ -27,6 +27,8 @@ final class Demo extends Component
 
     public bool $showEdit = false;
 
+    public bool $showServer = false;
+
     public int $deletedId = 0;
 
     public function save(): void
@@ -41,6 +43,16 @@ final class Demo extends Component
     {
         $this->toastAfterRedirect('Saved for later', ToastVariant::Info);
         $this->redirect('/');
+    }
+
+    public function closeServer(): void
+    {
+        $this->showServer = false;
+    }
+
+    public function slowAction(int $id): void
+    {
+        usleep(600000);
     }
 
     public function warn(): void

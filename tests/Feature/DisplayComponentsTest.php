@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\ViewException;
 use Odden\Ui\Tests\Support\Html;
 
@@ -58,21 +59,26 @@ it('refuses an icon-only button without a label', function (): void {
     Html::render('<x-ui::button icon="fas-check" />');
 })->throws(ViewException::class, 'needs a label');
 
-it('shows a busy spinner for the livewire action it triggers', function (): void {
-    $button = Html::render('<x-ui::button wire:click="save">Save</x-ui::button>')->querySelector('button');
+it('tracks the loading state of a button that triggers a livewire action', function (): void {
+    $button = Html::render('<x-ui::button wire:click.prevent="remove(\'a&b\')">Remove</x-ui::button>')->querySelector('button');
 
-    expect($button->getAttribute('wire:target'))->toBe('save')
-        ->and($button->getAttribute('wire:loading.attr'))->toBe('aria-busy')
-        ->and($button->querySelector('svg')->getAttribute('wire:target'))->toBe('save');
+    expect($button->hasAttribute('wire:target'))->toBeFalse()
+        ->and($button->hasAttribute('x-init'))->toBeTrue()
+        ->and($button->getAttribute('x-init'))->toContain('data-loading', 'aria-busy')
+        ->and($button->querySelector('svg')->getAttribute('class'))->toContain('group-data-loading:inline-block');
 });
 
-it('keeps the busy target when the click arguments hold special characters', function (): void {
-    $button = Html::render('<x-ui::button wire:click.prevent="remove(\'a&b <c> &quot;d\')">Remove</x-ui::button>')->querySelector('button');
+it('shows no loading state on a button without a livewire action', function (): void {
+    $button = Html::render('<x-ui::button>Plain</x-ui::button>')->querySelector('button');
 
-    expect($button->getAttribute('wire:target'))->toBe('remove')
-        ->and($button->getAttribute('wire:loading.attr'))->toBe('aria-busy')
-        ->and($button->getAttribute('wire:click.prevent'))->toBe('remove(\'a&b <c> "d\')')
-        ->and($button->querySelector('svg')->getAttribute('wire:target'))->toBe('remove');
+    expect($button->hasAttribute('x-init'))->toBeFalse()
+        ->and($button->querySelector('svg'))->toBeNull();
+});
+
+it('renders the modal dialog inside a teleport to the body', function (): void {
+    $html = Blade::render('<x-ui::modal name="edit" heading="Edit">Body</x-ui::modal>');
+
+    expect($html)->toMatch('#<template x-teleport="body">\s*<div[^>]*role="dialog"#');
 });
 
 it('drops every click handler from a disabled link', function (): void {
@@ -227,4 +233,13 @@ it('hands toasts flashed to the session to the live region', function (): void {
     $region = Html::render('<x-ui::toasts />')->querySelector('[aria-live]');
 
     expect($region->getAttribute('x-data'))->toContain('Saved earlier');
+});
+
+it('drops every href, click, keydown and navigate attribute from a disabled link', function (): void {
+    $link = Html::render('<x-ui::button href="/billing" disabled x-bind:href="url" wire:navigate wire:navigate.hover x-on:keydown.enter="go()" @keydown.space="go()" x-on:keyup.enter="go()" wire:keydown.enter="go">Billing</x-ui::button>')->querySelector('a');
+
+    $names = array_map(fn ($attribute): string => $attribute->name, iterator_to_array($link->attributes));
+
+    expect($link->getAttribute('aria-disabled'))->toBe('true')
+        ->and($names)->not->toContain('href', 'x-bind:href', 'wire:navigate', 'wire:navigate.hover', 'x-on:keydown.enter', '@keydown.space', 'x-on:keyup.enter', 'wire:keydown.enter');
 });

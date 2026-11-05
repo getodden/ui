@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Odden\Ui\Livewire\Concerns;
 
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Locked;
 use Odden\Ui\Enums\ButtonVariant;
@@ -66,7 +67,7 @@ trait WithConfirmation
 
     private function assertConfirmable(string $action): void
     {
-        if (self::isReserved($action)) {
+        if ($this->isReserved($action)) {
             throw new InvalidArgumentException("[{$action}] cannot be confirmed.");
         }
 
@@ -81,10 +82,26 @@ trait WithConfirmation
         }
     }
 
-    private static function isReserved(string $action): bool
+    private function isReserved(string $action): bool
     {
-        return in_array($action, ['confirm', 'runConfirmation', 'cancelConfirmation'], true)
-            || preg_match('/^(mount|boot|hydrate|dehydrate|updating|updated)/i', $action) === 1
-            || in_array(strtolower($action), ['render', 'rendering', 'rendered', 'exception'], true);
+        return in_array($action, ['confirm', 'runConfirmation', 'cancelConfirmation', 'render', 'mount', 'boot', 'booted', 'exception', 'rendering', 'rendered', 'scriptSrc'], true)
+            || Str::is(['hydrate*', 'dehydrate*', 'updating*', 'updated*'], $action)
+            || in_array($action, $this->traitLifecycleHooks(), true);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function traitLifecycleHooks(): array
+    {
+        $hooks = [];
+
+        foreach (class_uses_recursive($this) as $trait) {
+            foreach (['mount', 'boot', 'booted'] as $prefix) {
+                $hooks[] = $prefix.class_basename($trait);
+            }
+        }
+
+        return $hooks;
     }
 }

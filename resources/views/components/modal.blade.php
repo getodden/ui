@@ -16,20 +16,54 @@
 @endphp
 
 <div
-    x-data="{ open: false, name: @js($name) }"
+    x-data="{
+        open: false,
+        name: @js($name),
+        opener: null,
+        focusDelay: 25,
+        layer: 50,
+        remember() {
+            this.opener = document.activeElement
+            window.uiModalLayer = (window.uiModalLayer ?? this.layer) + 1
+            this.$refs.dialog.style.zIndex = window.uiModalLayer
+            setTimeout(() => this.focusInitial(), this.focusDelay)
+        },
+        focusInitial() {
+            const dialog = this.$refs.dialog
+            if (!this.open) return
+            if (getComputedStyle(dialog).display === 'none') {
+                requestAnimationFrame(() => this.focusInitial())
+                return
+            }
+            const target = dialog.querySelector('[data-autofocus]')
+            if (target) target.focus()
+            else this.$focus.within(dialog).first()
+        },
+        restore() {
+            const opener = this.opener
+            this.opener = null
+            if (opener) this.$nextTick(() => opener.isConnected && opener.focus())
+        },
+        destroy() {
+            const opener = this.open ? this.opener : null
+            if (opener) setTimeout(() => opener.isConnected && opener.focus())
+        }
+    }"
     x-modelable="open"
     x-on:ui-modal-open.window="if (name !== null && $event.detail?.name === name) open = true"
     x-on:ui-modal-close.window="if (name !== null && $event.detail?.name === name) open = false"
     {{ $attributes }}
 >
+<template x-teleport="body">
     <div
         x-ref="dialog"
         x-show="open"
-        x-effect="if (open) { $refs.dialog.uiOpener = document.activeElement; setTimeout(() => open && ($refs.dialog.querySelector('[data-autofocus]') ? $refs.dialog.querySelector('[data-autofocus]').focus() : $focus.within($refs.dialog).first()), 25) } else if ($refs.dialog.uiOpener) { const opener = $refs.dialog.uiOpener; $refs.dialog.uiOpener = null; $nextTick(() => opener.isConnected && opener.focus()) }"
+        x-effect="open ? remember() : restore()"
         x-trap.noscroll.noautofocus.noreturn="open"
         x-on:keydown.escape.stop="open = false"
         style="display: none"
         role="dialog"
+        @if ($name !== null) data-ui-modal="{{ $name }}" @endif
         aria-modal="true"
         aria-labelledby="{{ $baseId }}-heading"
         @if ($hasDescription) aria-describedby="{{ $baseId }}-description" @endif
@@ -56,4 +90,5 @@
             @endif
         </div>
     </div>
+</template>
 </div>

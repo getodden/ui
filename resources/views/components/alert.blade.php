@@ -24,12 +24,32 @@
         default => 'fas-circle-info',
     };
 
+    $dismissData = <<<'JS'
+    {
+        open: true,
+        focusable: 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        dismiss(alert) {
+            if (alert.contains(document.activeElement)) {
+                const region = alert.parentElement
+                const next = [...region.querySelectorAll(this.focusable)].find((candidate) => !alert.contains(candidate) && alert.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING)
+                if (next) {
+                    next.focus()
+                } else {
+                    if (!region.hasAttribute('tabindex')) region.setAttribute('tabindex', '-1')
+                    region.focus()
+                }
+            }
+            this.open = false
+        }
+    }
+    JS;
+
     $hasHeading = filled(trim((string) $heading));
 @endphp
 
 <div
     role="{{ $role }}"
-    {{ $attributes->merge($dismissible ? ['x-data' => '{ open: true }', 'x-show' => 'open'] : [])->class(["flex items-start gap-3 rounded-surface border p-4 text-gray-700 dark:text-gray-300 {$variantClasses}"]) }}
+    {{ $attributes->merge($dismissible ? ['x-data' => $dismissData, 'x-show' => 'open'] : [])->class(["flex items-start gap-3 rounded-surface border p-4 text-gray-700 dark:text-gray-300 {$variantClasses}"]) }}
 >
     <x-ui::icon :name="$icon ?? $defaultIcon" size="lg" class="mt-0.5 {{ $accentClasses }}" />
 
@@ -43,7 +63,7 @@
     @if ($dismissible)
         <button
             type="button"
-            x-on:click="open = false"
+            x-on:click="dismiss($root)"
             aria-label="{{ __('ui::ui.dismiss') }}"
             class="-m-1 rounded-control p-1 text-gray-700 hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:text-gray-300 dark:hover:bg-white/10 dark:focus-visible:outline-primary-400"
         >

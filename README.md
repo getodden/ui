@@ -63,7 +63,7 @@ Two fields bound to the same key on one page get the same id, so give one of the
 <x-ui::button x-on:click="$dispatch('ui-modal-open', { name: 'invite' })">Invite</x-ui::button>
 ```
 
-The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first focusable element. Escape closes only the modal that holds focus, so a modal opened from inside another closes first. A modal without a `heading` throws.
+The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` in `detail.name`. Put `data-autofocus` on an element inside the modal to start focus there instead of on the first focusable element. The dialog is teleported to `<body>`, and the most recently opened one is always on top, so a `ui::confirm` can sit anywhere in the page. If the modal is removed from the page while open, focus returns to its opener. Escape closes only the modal that holds focus, so a modal opened from inside another closes first. A modal without a `heading` throws.
 
 ## Livewire traits
 

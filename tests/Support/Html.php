@@ -16,8 +16,10 @@ final class Html
      */
     public static function render(string $template, array $data = []): HTMLDocument
     {
+        $html = preg_replace('#<template x-teleport="[^"]*">|</template>#', '', Blade::render($template, $data));
+
         return HTMLDocument::createFromString(
-            '<body>'.Blade::render($template, $data).'</body>',
+            '<body>'.$html.'</body>',
             LIBXML_NOERROR,
         );
     }

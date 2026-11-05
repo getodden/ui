@@ -66,8 +66,9 @@ it('refuses to confirm a lifecycle method', function (string $action): void {
     Livewire::test(ConfirmingComponent::class)
         ->call('askToDoSomethingElse', $action);
 })->throws(InvalidArgumentException::class, 'cannot be confirmed')->with([
-    'mount', 'mountExtras', 'boot', 'bootExtras', 'hydrate', 'hydrateExtras', 'dehydrate', 'dehydrateExtras',
+    'mount', 'boot', 'booted', 'hydrate', 'hydrateExtras', 'dehydrate', 'dehydrateExtras',
     'updating', 'updatingExtras', 'updated', 'updatedExtras', 'updatedConfirming', 'render', 'rendering', 'rendered', 'exception',
+    'mountWithConfirmation', 'bootWithConfirmation', 'bootedWithConfirmation',
 ]);
 
 it('rejects a tampered action from the browser', function (): void {
@@ -95,3 +96,11 @@ it('refuses to confirm the confirmation methods themselves', function (): void {
     Livewire::test(ConfirmingComponent::class)
         ->call('askToDoSomethingElse', 'runConfirmation');
 })->throws(InvalidArgumentException::class);
+
+it('confirms an ordinary method whose name only starts like a lifecycle hook', function (string $action): void {
+    Livewire::test(ConfirmingComponent::class)
+        ->call('askToDoSomethingElse', $action)
+        ->assertSet('confirming', true)
+        ->call('runConfirmation')
+        ->assertSet('removed', [$action]);
+})->with(['bootstrapWorkspace', 'mountVolume', 'renderPdf', 'exceptional']);

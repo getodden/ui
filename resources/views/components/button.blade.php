@@ -28,21 +28,18 @@
         default => 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-400 dark:text-gray-950 dark:hover:bg-primary-300',
     };
 
-    $classes = "inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {$sizeClasses} {$variantClasses}";
+    $classes = "group inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {$sizeClasses} {$variantClasses}";
 
     $tag = $href === null ? 'button' : 'a';
     $disabledLink = $tag === 'a' && $disabled;
 
     if ($disabledLink) {
-        $attributes = $attributes
-            ->whereDoesntStartWith('wire:click')
-            ->whereDoesntStartWith('x-on:click')
-            ->whereDoesntStartWith('@click');
+        $attributes = $attributes->filter(
+            fn ($value, $key): bool => preg_match('/^(wire:(click|navigate|keydown|keyup)|x-on:(click|keydown|keyup|keypress)|@(click|keydown|keyup|keypress)|x-bind(:href)?$|:href$|href$)/', (string) $key) !== 1
+        );
     }
 
-    $clickExpression = $attributes->whereStartsWith('wire:click')->first();
-    $clickedMethod = is_string($clickExpression) && preg_match('/^\s*([A-Za-z_$][\w$.]*)/', $clickExpression, $matches) === 1 ? $matches[1] : null;
-    $loadingTarget = $attributes->get('wire:target') ?? $clickedMethod;
+    $trackLoading = $attributes->whereStartsWith('wire:click')->isNotEmpty();
 
     $elementAttributes = $attributes->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
@@ -52,15 +49,14 @@
         'tabindex' => $disabledLink ? '-1' : null,
         'aria-disabled' => $disabledLink ? 'true' : null,
         'aria-label' => $iconOnly ? $label : null,
-        'wire:target' => $loadingTarget,
-        'wire:loading.attr' => $loadingTarget ? 'aria-busy' : null,
+        'x-init' => $trackLoading ? "new MutationObserver(() => \$el.hasAttribute('data-loading') ? \$el.setAttribute('aria-busy', 'true') : \$el.removeAttribute('aria-busy')).observe(\$el, { attributes: true, attributeFilter: ['data-loading'] })" : null,
     ], fn ($value) => $value !== null))->class($classes);
 @endphp
 
 <{{ $tag }} {{ $elementAttributes }}>
     <x-ui::icon :name="$icon" />
     {{ $slot }}
-    @if ($loadingTarget)
-        <x-ui::icon name="fas-spinner" class="hidden animate-spin" wire:loading.class.remove="hidden" :wire:target="$loadingTarget" />
+    @if ($trackLoading)
+        <x-ui::icon name="fas-spinner" class="hidden animate-spin group-data-loading:inline-block" />
     @endif
 </{{ $tag }}>
