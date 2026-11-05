@@ -1,0 +1,11 @@
+/vendor
+composer.lock
+.phpunit.result.cache
+.phpunit.cache
+/phpunit.xml
+.DS_Store
+.idea
+.pest
+/node_modules
+/tests/Browser/Screenshots
+/package-lock.json

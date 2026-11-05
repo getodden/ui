@@ -1,0 +1,1 @@
+<label for="{{ $id }}" class="block text-sm font-medium text-gray-900 dark:text-gray-100">{{ $label }}@if ($required) <span aria-hidden="true" class="text-rose-700 dark:text-rose-400">*</span>@endif</label>

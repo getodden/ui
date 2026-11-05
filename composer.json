@@ -1,0 +1,55 @@
+{
+    "name": "getodden/ui",
+    "description": "Blade components, Livewire traits and Tailwind 4 theme tokens for accessible Laravel Livewire screens.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["laravel", "livewire", "blade", "components", "tailwind", "accessibility"],
+    "homepage": "https://odden.io",
+    "support": {
+        "issues": "https://github.com/getodden/ui/issues",
+        "source": "https://github.com/getodden/ui"
+    },
+    "authors": [
+        {"name": "CaskStack, LLC", "homepage": "https://odden.io"}
+    ],
+    "require": {
+        "php": "^8.3",
+        "laravel/framework": "^13.0",
+        "livewire/livewire": "^4.0",
+        "owenvoke/blade-fontawesome": "^3.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.0",
+        "pestphp/pest": "^4.0 || ^5.0",
+        "pestphp/pest-plugin-browser": "^4.0 || ^5.0",
+        "pestphp/pest-plugin-laravel": "^4.0 || ^5.0"
+    },
+    "autoload": {
+        "psr-4": {"Odden\\Ui\\": "src/"}
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Odden\\Ui\\Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/pint",
+        "lint": "vendor/bin/pint --test"
+    },
+    "extra": {
+        "laravel": {
+            "providers": ["Odden\\Ui\\UiServiceProvider"]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {"pestphp/pest-plugin": true}
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

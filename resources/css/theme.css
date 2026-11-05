@@ -1,0 +1,34 @@
+@custom-variant dark (&:where(.dark, .dark *));
+
+@source '../views';
+
+@theme {
+    --color-primary-50: #f5f3ff;
+    --color-primary-100: #ede9fe;
+    --color-primary-200: #ddd6fe;
+    --color-primary-300: #c4b5fd;
+    --color-primary-400: #a78bfa;
+    --color-primary-500: #7c3aed;
+    --color-primary-600: #6d28d9;
+    --color-primary-700: #5b21b6;
+    --color-primary-800: #4c1d95;
+    --color-primary-900: #3d177d;
+    --color-primary-950: #2e1065;
+
+    --color-gray-50: #fafaf9;
+    --color-gray-100: #f4f4f2;
+    --color-gray-200: #e4e4e7;
+    --color-gray-300: #d4d4d8;
+    --color-gray-400: #8b8b94;
+    --color-gray-500: #62626b;
+    --color-gray-600: #52525b;
+    --color-gray-700: #2a2a2e;
+    --color-gray-800: #232326;
+    --color-gray-900: #0f0f11;
+    --color-gray-950: #0a0a0b;
+
+    --radius-control: 0.625rem;
+    --radius-surface: 1rem;
+
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+}

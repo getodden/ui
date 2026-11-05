@@ -1,0 +1,21 @@
+providers:
+  - Livewire\LivewireServiceProvider
+  - BladeUI\Icons\BladeIconsServiceProvider
+  - OwenVoke\BladeFontAwesome\BladeFontAwesomeServiceProvider
+  - Odden\Ui\UiServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+env:
+  - APP_KEY=base64:a2tra2tra2tra2tra2tra2tra2tra2tra2tra2tra2s=
+  - SESSION_DRIVER=array
+  - CACHE_STORE=array
+
+workbench:
+  start: /
+  install: false
+  discovers:
+    web: false
+    api: false
+    commands: false
+    components: false
+    views: false
