@@ -85,11 +85,11 @@ document.addEventListener('alpine:init', () => registerEditor(window.Alpine))
 <x-ui::editor label="Reply" wire:model="body" mention-search="searchPeople" />
 ```
 
-Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Links accept http, https, mailto, tel and relative addresses. `wire:model.live` sends changes after a 150 ms pause (`.live.debounce.500ms` changes it), and `.blur` sends them when focus leaves.
+Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Links accept http, https, mailto, tel and relative addresses. `wire:model` follows Livewire 4: plain and `.blur` update the component without a request, `.live` sends after a 150 ms pause (`.live.debounce.500ms` and `.live.throttle.500ms` change it), and `.live.blur` sends on blur when the text changed.
 
 Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, which is read once and is visible in the page source, or from `mention-search`, a method on your component that takes the query and returns that same shape. Anyone can call that method with any string, so check who may see the results, cap the query and the number of results, return only `id` and `label`, and mark it `#[Renderless]`.
 
-The bound value is whatever the browser sends, so treat it as untrusted. Before you save it or print it with `{!! !!}`, pass HTML through `Odden\Ui\Support\RichHtml::clean()` and a `format="json"` document through `RichJson::clean()`. Both keep only what the editor can produce. Both throw a `LengthException` above their size limits (`RichHtml::MAXIMUM_BYTES`, `MAXIMUM_TAGS`, `RichJson::MAXIMUM_NODES`, `MAXIMUM_DEPTH`), so validate the length first.
+The bound value is whatever the browser sends, so treat it as untrusted. Before you save it or print it with `{!! !!}`, pass HTML through `Odden\Ui\Support\RichHtml::clean()` and a `format="json"` document through `RichJson::clean()`. Both keep only what the editor can produce. Both throw a `LengthException` above their size limits (`RichHtml::MAXIMUM_BYTES`, `MAXIMUM_TAGS`, `MAXIMUM_TAG_BYTES`, `RichJson::MAXIMUM_NODES`, `MAXIMUM_DEPTH`), so validate the length first.
 
 ### Table
 
