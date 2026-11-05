@@ -65,7 +65,20 @@ it('tracks the loading state of a button that triggers a livewire action', funct
     expect($button->hasAttribute('wire:target'))->toBeFalse()
         ->and($button->hasAttribute('x-init'))->toBeTrue()
         ->and($button->getAttribute('x-init'))->toContain('data-loading', 'aria-busy')
-        ->and($button->querySelector('svg')->getAttribute('class'))->toContain('group-data-loading:inline-block');
+        ->and($button->querySelector('svg')->getAttribute('class'))->toContain('group-data-loading/ui-button:inline-block')
+        ->and($button->getAttribute('class'))->toContain('group/ui-button');
+});
+
+it('keeps a consumer x-init next to the busy observer', function (): void {
+    $button = Html::render('<x-ui::button wire:click="remove" x-init="window.started = true">Remove</x-ui::button>')->querySelector('button');
+
+    expect($button->getAttribute('x-init'))->toContain('window.started = true', 'aria-busy');
+});
+
+it('keeps a consumer x-init on a button without a livewire action', function (): void {
+    $button = Html::render('<x-ui::button x-init="window.started = true">Plain</x-ui::button>')->querySelector('button');
+
+    expect($button->getAttribute('x-init'))->toBe('window.started = true');
 });
 
 it('shows no loading state on a button without a livewire action', function (): void {
@@ -73,6 +86,14 @@ it('shows no loading state on a button without a livewire action', function (): 
 
     expect($button->hasAttribute('x-init'))->toBeFalse()
         ->and($button->querySelector('svg'))->toBeNull();
+});
+
+it('unwraps teleports without swallowing the markup after other templates', function (): void {
+    $document = Html::render('<template x-teleport="body"><p id="teleported">In</p></template><template x-for="n in [1]"><i></i></template><p id="after">After</p>');
+
+    expect($document->getElementById('teleported'))->not->toBeNull()
+        ->and($document->getElementById('after'))->not->toBeNull()
+        ->and($document->querySelector('template[x-teleport]'))->toBeNull();
 });
 
 it('renders the modal dialog inside a teleport to the body', function (): void {

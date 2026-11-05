@@ -28,7 +28,7 @@
         default => 'bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-400 dark:text-gray-950 dark:hover:bg-primary-300',
     };
 
-    $classes = "group inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {$sizeClasses} {$variantClasses}";
+    $classes = "group/ui-button inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {$sizeClasses} {$variantClasses}";
 
     $tag = $href === null ? 'button' : 'a';
     $disabledLink = $tag === 'a' && $disabled;
@@ -40,8 +40,10 @@
     }
 
     $trackLoading = $attributes->whereStartsWith('wire:click')->isNotEmpty();
+    $busyObserver = "new MutationObserver(() => \$el.hasAttribute('data-loading') ? \$el.setAttribute('aria-busy', 'true') : \$el.removeAttribute('aria-busy')).observe(\$el, { attributes: true, attributeFilter: ['data-loading'] })";
+    $initExpression = collect([$attributes->get('x-init'), $trackLoading ? $busyObserver : null])->filter()->implode('; ');
 
-    $elementAttributes = $attributes->merge(array_filter([
+    $elementAttributes = $attributes->except('x-init')->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
         'disabled' => $tag === 'button' && $disabled ? true : null,
         'href' => $tag === 'a' && ! $disabled ? $href : null,
@@ -49,7 +51,7 @@
         'tabindex' => $disabledLink ? '-1' : null,
         'aria-disabled' => $disabledLink ? 'true' : null,
         'aria-label' => $iconOnly ? $label : null,
-        'x-init' => $trackLoading ? "new MutationObserver(() => \$el.hasAttribute('data-loading') ? \$el.setAttribute('aria-busy', 'true') : \$el.removeAttribute('aria-busy')).observe(\$el, { attributes: true, attributeFilter: ['data-loading'] })" : null,
+        'x-init' => $initExpression === '' ? null : $initExpression,
     ], fn ($value) => $value !== null))->class($classes);
 @endphp
 
@@ -57,6 +59,6 @@
     <x-ui::icon :name="$icon" />
     {{ $slot }}
     @if ($trackLoading)
-        <x-ui::icon name="fas-spinner" class="hidden animate-spin group-data-loading:inline-block" />
+        <x-ui::icon name="fas-spinner" class="hidden animate-spin group-data-loading/ui-button:inline-block" />
     @endif
 </{{ $tag }}>

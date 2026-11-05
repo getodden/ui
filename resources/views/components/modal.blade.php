@@ -21,11 +21,9 @@
         name: @js($name),
         opener: null,
         focusDelay: 25,
-        layer: 50,
         remember() {
             this.opener = document.activeElement
-            window.uiModalLayer = (window.uiModalLayer ?? this.layer) + 1
-            this.$refs.dialog.style.zIndex = window.uiModalLayer
+            document.body.appendChild(this.$refs.dialog)
             setTimeout(() => this.focusInitial(), this.focusDelay)
         },
         focusInitial() {

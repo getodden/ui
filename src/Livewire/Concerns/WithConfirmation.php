@@ -32,9 +32,9 @@ trait WithConfirmation
         string $confirmLabel,
         ButtonVariant $variant = ButtonVariant::Danger,
     ): void {
-        $this->assertConfirmable($action);
+        $name = $this->assertConfirmable($action);
 
-        $this->confirmation = (new PendingConfirmation($action, $arguments, $title, $message, $confirmLabel, $variant))->toArray();
+        $this->confirmation = (new PendingConfirmation($name, $arguments, $title, $message, $confirmLabel, $variant))->toArray();
         $this->confirming = true;
     }
 
@@ -48,8 +48,8 @@ trait WithConfirmation
 
         $this->cancelConfirmation();
 
-        $this->assertConfirmable($pending->action);
-        $this->{$pending->action}(...$pending->arguments);
+        $name = $this->assertConfirmable($pending->action);
+        $this->{$name}(...$pending->arguments);
     }
 
     public function cancelConfirmation(): void
@@ -65,21 +65,20 @@ trait WithConfirmation
         }
     }
 
-    private function assertConfirmable(string $action): void
+    private function assertConfirmable(string $action): string
     {
-        if ($this->isReserved($action)) {
-            throw new InvalidArgumentException("[{$action}] cannot be confirmed.");
+        $method = method_exists($this, $action) ? new ReflectionMethod($this, $action) : null;
+        $name = $method?->getName() ?? $action;
+
+        if ($this->isReserved($name) || str_starts_with($method?->getDeclaringClass()->getName() ?? '', 'Livewire\\')) {
+            throw new InvalidArgumentException("[{$name}] cannot be confirmed.");
         }
 
-        if (! method_exists($this, $action)) {
+        if ($method === null) {
             throw new InvalidArgumentException("[{$action}] is not a method on ".static::class.'.');
         }
 
-        $declaringClass = (new ReflectionMethod($this, $action))->getDeclaringClass()->getName();
-
-        if (str_starts_with($declaringClass, 'Livewire\\')) {
-            throw new InvalidArgumentException("[{$action}] cannot be confirmed.");
-        }
+        return $name;
     }
 
     private function isReserved(string $action): bool

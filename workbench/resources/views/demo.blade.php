@@ -1,6 +1,16 @@
 <div>
     <x-ui::confirm :confirmation="$confirmation" />
 
+    <x-ui::modal name="inner" heading="Inner modal">
+        <x-ui::button id="ping" wire:click="ping">Ping</x-ui::button>
+    </x-ui::modal>
+    <x-ui::modal name="outer" heading="Outer modal">
+        <x-ui::button id="open-inner" x-on:click="$dispatch('ui-modal-open', { name: 'inner' })">Open inner</x-ui::button>
+        <x-ui::button id="warn-in-outer" wire:click="warn">Warn</x-ui::button>
+    </x-ui::modal>
+    <x-ui::button id="open-outer" x-on:click="$dispatch('ui-modal-open', { name: 'outer' })">Open outer</x-ui::button>
+    <span id="pings">{{ $pings }}</span>
+
     <h1>Odden UI demo</h1>
 
     <x-ui::card heading="Account">
@@ -52,6 +62,7 @@
     @endif
 
     <x-ui::alert variant="info" id="second-alert" dismissible>Second alert</x-ui::alert>
+    <input type="hidden" name="_token" value="x">
     <x-ui::button id="after-alerts" variant="ghost">After alerts</x-ui::button>
 
     @if ($deletedId)

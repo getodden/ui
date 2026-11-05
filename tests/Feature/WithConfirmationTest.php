@@ -69,6 +69,7 @@ it('refuses to confirm a lifecycle method', function (string $action): void {
     'mount', 'boot', 'booted', 'hydrate', 'hydrateExtras', 'dehydrate', 'dehydrateExtras',
     'updating', 'updatingExtras', 'updated', 'updatedExtras', 'updatedConfirming', 'render', 'rendering', 'rendered', 'exception',
     'mountWithConfirmation', 'bootWithConfirmation', 'bootedWithConfirmation',
+    'Render', 'UpdatedConfirming', 'CancelConfirmation',
 ]);
 
 it('rejects a tampered action from the browser', function (): void {

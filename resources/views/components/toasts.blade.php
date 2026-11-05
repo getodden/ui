@@ -61,7 +61,7 @@
     x-on:mouseleave="resumeSoon()"
     x-on:focusin="pause()"
     x-on:focusout="resumeSoon()"
-    {{ $attributes->class(['pointer-events-none fixed outline-none inset-x-0 bottom-0 z-50 flex flex-col items-end gap-2 p-4']) }}
+    {{ $attributes->class(['pointer-events-none fixed outline-none inset-x-0 bottom-0 z-60 flex flex-col items-end gap-2 p-4']) }}
 >
     <template x-for="toast in toasts" :key="toast.id">
         <div

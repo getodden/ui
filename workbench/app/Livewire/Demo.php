@@ -31,6 +31,13 @@ final class Demo extends Component
 
     public int $deletedId = 0;
 
+    public int $pings = 0;
+
+    public function ping(): void
+    {
+        $this->pings++;
+    }
+
     public function save(): void
     {
         $this->validate(['name' => 'required|min:3']);

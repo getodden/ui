@@ -27,11 +27,11 @@
     $dismissData = <<<'JS'
     {
         open: true,
-        focusable: 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        focusable: 'a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
         dismiss(alert) {
             if (alert.contains(document.activeElement)) {
                 const region = alert.parentElement
-                const next = [...region.querySelectorAll(this.focusable)].find((candidate) => !alert.contains(candidate) && alert.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING)
+                const next = [...region.querySelectorAll(this.focusable)].find((candidate) => !alert.contains(candidate) && alert.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING && candidate.checkVisibility())
                 if (next) {
                     next.focus()
                 } else {

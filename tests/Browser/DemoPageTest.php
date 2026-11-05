@@ -10,6 +10,11 @@ function dialogIsClosed(string $selector): string
     return 'getComputedStyle(document.querySelector(\''.$selector.'\')).display === "none"';
 }
 
+function topmostAtCentreOf(string $selector): string
+{
+    return '(() => { const box = document.querySelector(\''.$selector.'\').getBoundingClientRect(); const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return document.querySelector(\''.$selector.'\').contains(top) })()';
+}
+
 function focusIsInside(string $selector): string
 {
     return 'document.querySelector(\''.$selector.'\').contains(document.activeElement)';
@@ -194,4 +199,37 @@ it('moves focus to the parent region when a dismissed alert has nothing focusabl
     $page->keys(':focus', 'Enter')
         ->assertScript('getComputedStyle(document.querySelector("#second-alert")).display === "none"')
         ->assertScript('document.activeElement === document.querySelector("#second-alert").parentElement');
+});
+
+it('keeps a modal opened later on top, also after a Livewire request from inside it', function (): void {
+    $page = visit('/');
+
+    $page->click('#open-outer')->assertVisible('[data-ui-modal=outer]')
+        ->click('#open-inner')->assertVisible('[data-ui-modal=inner]')
+        ->assertScript(topmostAtCentreOf('[data-ui-modal=inner] h2'))
+        ->assertScript(focusIsInside('[data-ui-modal=inner]'));
+
+    $page->click('#ping')->assertSeeIn('#pings', '1')
+        ->assertScript(topmostAtCentreOf('[data-ui-modal=inner] h2'))
+        ->assertScript(focusIsInside('[data-ui-modal=inner]'))
+        ->click('#ping')->assertSeeIn('#pings', '2')
+        ->assertScript(topmostAtCentreOf('[data-ui-modal=inner] h2'));
+});
+
+it('shows a toast raised from inside an open modal above the modal', function (): void {
+    $page = visit('/');
+
+    $page->click('#open-outer')->assertVisible('[data-ui-modal=outer]')
+        ->click('#warn-in-outer')->assertSee('Careful now')
+        ->assertScript('(() => { const toast = document.querySelector("[data-toast-id]"); const box = toast.getBoundingClientRect(); return toast.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)) })()');
+});
+
+it('moves focus past a hidden input when a focused alert is dismissed', function (): void {
+    $page = visit('/');
+
+    $page->script('document.querySelector("#second-alert button").focus()');
+
+    $page->keys(':focus', 'Enter')
+        ->assertScript('document.querySelector("#second-alert").nextElementSibling.matches("input[type=hidden]")')
+        ->assertScript('document.activeElement.id === "after-alerts"');
 });
