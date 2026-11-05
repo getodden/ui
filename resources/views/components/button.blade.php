@@ -40,7 +40,7 @@
     }
 
     $trackLoading = $attributes->whereStartsWith('wire:click')->isNotEmpty();
-    $busyObserver = "const button = \$el.parentElement; new MutationObserver(() => button.hasAttribute('data-loading') ? button.setAttribute('aria-busy', 'true') : button.removeAttribute('aria-busy')).observe(button, { attributes: true, attributeFilter: ['data-loading'] })";
+    $busyObserver = "const button = \$el.parentElement; (button.uiBusyObserver ??= new MutationObserver(() => button.hasAttribute('data-loading') ? button.setAttribute('aria-busy', 'true') : button.removeAttribute('aria-busy'))).observe(button, { attributes: true, attributeFilter: ['data-loading'] })";
 
     $elementAttributes = $attributes->merge(array_filter([
         'type' => $tag === 'button' ? $type : null,
