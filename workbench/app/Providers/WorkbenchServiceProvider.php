@@ -7,6 +7,7 @@ namespace Workbench\App\Providers;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
+use Workbench\App\ImportMap;
 use Workbench\App\Livewire\Demo;
 use Workbench\App\Livewire\EditorDemo;
 use Workbench\App\Livewire\TableDemo;
@@ -21,5 +22,6 @@ final class WorkbenchServiceProvider extends ServiceProvider
         Livewire::component('editor-demo', EditorDemo::class);
         Livewire::component('table-demo', TableDemo::class);
         Route::middleware('web')->get('/', Demo::class);
+        Route::get('__workbench/{root}/{path}', fn (string $root, string $path) => ImportMap::response($root, $path))->where('root', 'js|npm')->where('path', '.*');
     }
 }
