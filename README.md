@@ -69,10 +69,10 @@ The `ui-modal-open` and `ui-modal-close` window events take the modal's `name` i
 
 ### Editor
 
-A TipTap rich-text field. Its HTML, mentions included, matches Filament's RichEditor, so content stored by one opens in the other. Install the TipTap packages in your app and register the Alpine data before Alpine starts:
+A TipTap rich-text field. It reads and writes the same HTML and JSON as Filament's RichEditor for paragraphs, headings 1 to 4, bold, italic, underline, strike, inline code, code blocks, links, lists, blockquotes, rules and mentions. Text alignment, sub- and superscript, colours, tables, images and custom blocks are not supported: stored HTML loses them when saved, and a stored JSON document holding them opens read-only with a notice, so it is never overwritten. Install TipTap 3 in your app and register the Alpine data before Alpine starts:
 
 ```bash
-npm install @tiptap/core @tiptap/pm @tiptap/starter-kit @tiptap/extension-mention @tiptap/suggestion
+npm install @tiptap/core@^3 @tiptap/pm@^3 @tiptap/starter-kit@^3 @tiptap/extension-mention@^3 @tiptap/suggestion@^3
 ```
 
 ```js
@@ -85,9 +85,11 @@ document.addEventListener('alpine:init', () => registerEditor(window.Alpine))
 <x-ui::editor label="Reply" wire:model="body" mention-search="searchPeople" />
 ```
 
-Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, or from `mention-search`, a public method on your component that takes the query and returns that same shape. Links accept only http, https, mailto and tel.
+Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` and `heading-3`. Links accept http, https, mailto, tel and relative addresses. `wire:model.live` sends changes after a 150 ms pause (`.live.debounce.500ms` changes it), and `.blur` sends them when focus leaves.
 
-The bound value is whatever the browser sends, so treat it as untrusted. Pass it through `Odden\Ui\Support\RichHtml::clean()` before you save it or print it with `{!! !!}`. `clean()` keeps only what the editor can produce and drops everything else.
+Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, which is read once and is visible in the page source, or from `mention-search`, a method on your component that takes the query and returns that same shape. Anyone can call that method with any string, so check who may see the results, cap the query and the number of results, return only `id` and `label`, and mark it `#[Renderless]`.
+
+The bound value is whatever the browser sends, so treat it as untrusted. Before you save it or print it with `{!! !!}`, pass HTML through `Odden\Ui\Support\RichHtml::clean()` and a `format="json"` document through `RichJson::clean()`. Both keep only what the editor can produce. Both throw a `LengthException` above their size limits (`RichHtml::MAXIMUM_BYTES`, `MAXIMUM_TAGS`, `RichJson::MAXIMUM_NODES`, `MAXIMUM_DEPTH`), so validate the length first.
 
 ### Table
 
@@ -140,6 +142,8 @@ class Contacts extends Component
 
 A filter closure receives the raw string from the request, so validate it there. Override `defaultSort()`, `defaultDirection()`, `perPageOptions()` or `applySearch()` when you need to.
 
+A chosen sort replaces any order on your base query, and the model key always breaks ties, so pages stay stable. Search compares `lower(column) like lower(term)`. On PostgreSQL that fails for columns that are not text, such as integers, uuids and json, so search those in your own `applySearch()`. On SQLite only ASCII letters match regardless of case. A page past the end shows the last page.
+
 `WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds, and hovering or focusing the toasts holds them.
 
 `WithConfirmation` asks before a destructive action and keeps what was asked in a `#[Locked]` property, so the browser cannot change which method runs or with what arguments. The confirmed method may be `protected`, so confirming is the only way to reach it.
@@ -176,6 +180,8 @@ class Contacts extends Component
 - The toast region is `aria-live="polite"` and is in the page from the start. Danger and warning alerts use `role="alert"`, the others `role="status"`.
 - Control borders (inputs, selects, textareas, outline buttons) meet the 3:1 non-text contrast of WCAG 1.4.11. A disabled link button has no `href` and no click handlers.
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
+- The editor's toolbar is one tab stop with arrow-key movement and `aria-pressed` on toggles; the editable area is a labelled `textbox`, and mention suggestions are a `listbox` it points at with `aria-activedescendant`.
+- Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
 
 ## Development
 
