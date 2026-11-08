@@ -42,6 +42,10 @@ final class FormsDemo extends Component
 
     public string $owner = '';
 
+    public string $reviewer = '';
+
+    public string $reviewerName = '';
+
     public string $assignee = '';
 
     public string $assigneeName = '';
@@ -92,6 +96,11 @@ final class FormsDemo extends Component
     public function updatedCustomer(string $value): void
     {
         $this->customerName = collect($this->searchCustomers(''))->firstWhere('id', (int) $value)['label'] ?? '';
+    }
+
+    public function updatedReviewer(string $value): void
+    {
+        $this->reviewerName = collect($this->searchCustomers(''))->firstWhere('id', (int) $value)['label'] ?? '';
     }
 
     public function assignAlan(): void

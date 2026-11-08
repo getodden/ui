@@ -160,6 +160,23 @@ it('shows the new label when the server changes a combobox value and its label',
         ->assertScript('document.querySelector("#assignee").value === "Alan Turing"');
 });
 
+it('keeps what is typed into a live combobox after a pick when the server clears its label', function (): void {
+    $page = visit('/');
+
+    $page->type('#reviewer', 'turing');
+    $page->script(formsSettled('true'));
+    $page->assertScript('document.querySelector("#reviewer").value === "turing"');
+    $page->assertScript('document.querySelectorAll("#reviewer-listbox [role=option]").length === 1');
+    $page->script('document.getElementById("reviewer-option-0").click()');
+    $page->script(formsSettled('true'));
+    $page->assertScript('document.querySelector("[data-label=\\"Alan Turing\\"]") !== null');
+    $page->script('(() => { const input = document.querySelector("#reviewer"); input.focus(); input.select(); input.value = "G"; input.dispatchEvent(new Event("input", { bubbles: true })) })()');
+    $page->script(formsSettled('true', 900));
+
+    $page->assertScript(FORMS_WIRE.'.reviewerName === ""')
+        ->assertScript('document.querySelector("#reviewer").value === "G"');
+});
+
 it('copes with a multiselect bound to a null value', function (): void {
     $page = visit('/');
 

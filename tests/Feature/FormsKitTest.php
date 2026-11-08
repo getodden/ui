@@ -438,19 +438,49 @@ it('refuses an id on a tab', function (): void {
     Html::render('<x-ui::tabs id="t" label="x" :tabs="[\'a\' => \'A\']"><x-ui::tab name="a" id="own">x</x-ui::tab></x-ui::tabs>');
 })->throws(ViewException::class, 'takes its id from the tabs');
 
-it('gives dropdowns, collapsibles and cards that share a label different ids when their content differs', function (): void {
+it('gives dropdowns, collapsibles and cards that share a label different ids when their wire:key differs', function (): void {
     $dom = Html::render('
-        <x-ui::dropdown label="Actions" icon-only><x-ui::dropdown.item wire:click="edit(1)">Edit</x-ui::dropdown.item></x-ui::dropdown>
-        <x-ui::dropdown label="Actions" icon-only><x-ui::dropdown.item wire:click="edit(2)">Edit</x-ui::dropdown.item></x-ui::dropdown>
-        <x-ui::collapsible heading="Notes">One</x-ui::collapsible>
-        <x-ui::collapsible heading="Notes">Two</x-ui::collapsible>
-        <x-ui::card heading="Notes">One</x-ui::card>
-        <x-ui::card heading="Notes">Two</x-ui::card>
+        <x-ui::dropdown wire:key="a" label="Actions" icon-only><x-ui::dropdown.item>Edit</x-ui::dropdown.item></x-ui::dropdown>
+        <x-ui::dropdown wire:key="b" label="Actions" icon-only><x-ui::dropdown.item>Edit</x-ui::dropdown.item></x-ui::dropdown>
+        <x-ui::collapsible wire:key="a" heading="Notes">One</x-ui::collapsible>
+        <x-ui::collapsible wire:key="b" heading="Notes">One</x-ui::collapsible>
+        <x-ui::card wire:key="a" heading="Notes">One</x-ui::card>
+        <x-ui::card wire:key="b" heading="Notes">One</x-ui::card>
     ');
 
     $ids = array_map(fn ($element): string => $element->getAttribute('id'), iterator_to_array($dom->querySelectorAll('[id]')));
 
     expect($ids)->toHaveCount(count(array_unique($ids)));
+});
+
+it('keeps default ids the same when only the slot content changes', function (): void {
+    $ids = fn (string $content): array => [
+        Html::render('<x-ui::collapsible heading="Notes">'.$content.'</x-ui::collapsible>')->querySelector('button')->getAttribute('id'),
+        Html::render('<x-ui::dropdown label="Actions"><x-ui::dropdown.item>'.$content.'</x-ui::dropdown.item></x-ui::dropdown>')->querySelector('button')->getAttribute('id'),
+        Html::render('<x-ui::card heading="Notes">'.$content.'</x-ui::card>')->querySelector('section')->getAttribute('aria-labelledby'),
+    ];
+
+    expect($ids('Pin'))->toBe($ids('Unpin'));
+});
+
+it('puts wire:key and class of a dropdown on its root instead of the trigger', function (): void {
+    $dom = Html::render('<x-ui::dropdown wire:key="row-1" class="ml-2" label="Actions"><x-ui::dropdown.item>Edit</x-ui::dropdown.item></x-ui::dropdown>');
+    $root = $dom->querySelector('[x-data][wire\\:key]');
+    $trigger = $dom->querySelector('button');
+
+    expect($root->getAttribute('wire:key'))->toBe('row-1')
+        ->and($root->getAttribute('class'))->toContain('ml-2')
+        ->and($trigger->hasAttribute('wire:key'))->toBeFalse()
+        ->and($trigger->getAttribute('class'))->not->toContain('ml-2');
+});
+
+it('drops unsafe hrefs from breadcrumbs and dropdown items', function (): void {
+    $header = Html::render('<x-ui::page-header title="Ada" :breadcrumbs="[[\'label\' => \'Site\', \'href\' => \'javascript:alert(1)\'], [\'label\' => \'Safe\', \'href\' => \'/ok\'], [\'label\' => \'Ada\']]" />');
+    $item = Html::render('<x-ui::dropdown label="Actions"><x-ui::dropdown.item href="javascript:alert(1)">Go</x-ui::dropdown.item></x-ui::dropdown>');
+
+    expect($header->querySelectorAll('nav a'))->toHaveCount(1)
+        ->and($header->querySelector('nav a')->getAttribute('href'))->toBe('/ok')
+        ->and($item->querySelector('[role=menuitem]')->tagName)->toBe('BUTTON');
 });
 
 it('keeps default ids the same between renders', function (): void {

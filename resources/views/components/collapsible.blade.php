@@ -3,7 +3,7 @@
 @php
     throw_if(blank($heading), \InvalidArgumentException::class, 'A ui::collapsible needs a heading.');
 
-    $baseId = filled($id) ? $id : 'ui-collapsible-'.substr(sha1($heading.'|'.$attributes->get('wire:key').'|'.$slot), 0, 10);
+    $baseId = filled($id) ? $id : 'ui-collapsible-'.substr(sha1($heading.'|'.$attributes->get('wire:key')), 0, 10);
     $headingTag = 'h'.min(6, max(1, (int) $level));
 @endphp
 

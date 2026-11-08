@@ -4,7 +4,7 @@
     throw_if(blank($title), \InvalidArgumentException::class, 'A ui::page-header needs a title.');
 
     $headingTag = 'h'.min(6, max(1, (int) $level));
-    $crumbs = array_values($breadcrumbs);
+    $crumbs = array_map(fn (array $crumb): array => [...$crumb, 'href' => filled($crumb['href'] ?? null) ? \Odden\Ui\Support\SafeUri::clean((string) $crumb['href']) : null], array_values($breadcrumbs));
     $lastCrumb = count($crumbs) - 1;
     $hasActions = isset($actions) && filled(trim((string) $actions));
 @endphp

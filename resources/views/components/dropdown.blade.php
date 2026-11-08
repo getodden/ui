@@ -3,12 +3,13 @@
 @php
     throw_if(blank($label), \InvalidArgumentException::class, 'A ui::dropdown needs a label.');
 
-    $baseId = filled($id) ? $id : 'ui-dropdown-'.substr(sha1($label.'|'.$attributes->get('wire:key').'|'.$slot), 0, 10);
+    $baseId = filled($id) ? $id : 'ui-dropdown-'.substr(sha1($label.'|'.$attributes->get('wire:key')), 0, 10);
     $alignClasses = $align === 'end' ? 'right-0' : 'left-0';
 @endphp
 
 <div
-    class="relative inline-block"
+    {{ $attributes->whereStartsWith('wire:key') }}
+    {{ $attributes->only('class')->class(['relative inline-block']) }}
     x-data="{
         open: false,
         items() {
@@ -51,6 +52,7 @@
     x-on:click.outside="close()"
 >
     @php
+        $attributes = $attributes->whereDoesntStartWith('wire:key')->except('class');
         $triggerBindings = [
             'variant' => $variant,
             'size' => $size,

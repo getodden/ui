@@ -27,6 +27,7 @@
         <x-ui::combobox label="Customer" id="customer" wire:model="customer" search="searchCustomers" :value-label="$customerName" placeholder="Type a name" hint="Searches as you type" />
         <x-ui::multiselect label="Numeric tags" id="numeric-tags" wire:model="numericTags" :options="[3 => 'Alpha', 5 => 'Beta', 7 => 'Gamma']" />
         <x-ui::combobox label="Owner" id="owner" wire:model="owner" search="searchCustomers" :minimum="3" />
+        <x-ui::combobox label="Reviewer" id="reviewer" wire:model.live="reviewer" search="searchCustomers" :value-label="$reviewerName" />
         <x-ui::combobox label="Assignee" id="assignee" wire:model="assignee" search="searchCustomers" :value-label="$assigneeName" />
         <x-ui::multiselect label="Unset tags" id="unset-tags" wire:model="unsetTags" :options="['a' => 'Alpha', 'b' => 'Beta']" />
         <x-ui::file label="Attachment" wire:model="attachment" />
