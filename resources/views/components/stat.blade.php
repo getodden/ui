@@ -9,11 +9,11 @@
 
     $hasDelta = filled($delta);
     $direction = in_array($direction, ['up', 'down', 'flat'], true) ? $direction : match (true) {
+        preg_match('/^[+\-−]?0+([.,]0+)?\s*%?$/u', trim((string) $delta)) === 1 => 'flat',
         is_numeric($delta) && (float) $delta > 0 => 'up',
         is_numeric($delta) && (float) $delta < 0 => 'down',
         str_starts_with(trim((string) $delta), '+') => 'up',
         str_starts_with(trim((string) $delta), '-'), str_starts_with(trim((string) $delta), '−') => 'down',
-        preg_match('/^[+\-−]?0+([.,]0+)?\s*%?$/u', trim((string) $delta)) === 1 => 'flat',
         default => null,
     };
     $sentiment = in_array($sentiment, ['positive', 'negative', 'neutral'], true) ? $sentiment : match ($direction) {

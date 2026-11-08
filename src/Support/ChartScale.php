@@ -50,10 +50,8 @@ final class ChartScale
     {
         $absolute = abs($value);
         $decimals = $absolute > 0 && $absolute < 1 ? min(10, 2 - (int) floor(log10($absolute))) : 2;
-        $formatted = number_format($value, $decimals, '.', ',');
-        $trimmed = rtrim(rtrim($formatted, '0'), '.');
 
-        return in_array($trimmed, ['-0', ''], true) ? '0' : $trimmed;
+        return self::trimmed($value, $decimals);
     }
 
     private static function trimmed(float $value, int $decimals): string

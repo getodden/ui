@@ -33,7 +33,7 @@
             @foreach ($geometry['ticks'] as $tick)
                 @if ($horizontal)
                     <line x1="{{ $tick['position'] }}" x2="{{ $tick['position'] }}" y1="{{ $plot['top'] }}" y2="{{ $plot['bottom'] }}" stroke-width="1" class="stroke-gray-200 dark:stroke-gray-800" />
-                    <text x="{{ $tick['position'] }}" y="{{ $plot['bottom'] + 16 }}" text-anchor="middle" font-size="11" class="fill-gray-600 dark:fill-gray-400">{{ $tick['label'] }}</text>
+                    <text x="{{ $tick['position'] }}" y="{{ $plot['bottom'] + 16 }}" text-anchor="{{ $tick['anchor'] }}" font-size="11" class="fill-gray-600 dark:fill-gray-400">{{ $tick['label'] }}</text>
                 @else
                     <line x1="{{ $plot['left'] }}" x2="{{ $plot['right'] }}" y1="{{ $tick['position'] }}" y2="{{ $tick['position'] }}" stroke-width="1" class="stroke-gray-200 dark:stroke-gray-800" />
                     <text x="{{ $plot['left'] - 6 }}" y="{{ $tick['position'] + 4 }}" text-anchor="end" font-size="11" class="fill-gray-600 dark:fill-gray-400">{{ $tick['label'] }}</text>

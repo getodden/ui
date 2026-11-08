@@ -98,11 +98,12 @@ final class ChartGeometry
 
         foreach ($categories as $position => $category) {
             if ($position % $step === 0) {
+                $labelPosition = round(($horizontal ? $plot['top'] : $plot['left']) + ($position + 0.5) * $bandLength, 2);
                 $labels[] = [
-                    'position' => round(($horizontal ? $plot['top'] : $plot['left']) + ($position + 0.5) * $bandLength, 2),
+                    'position' => $labelPosition,
                     'text' => $shortened[$position],
                     'full' => $category,
-                    'anchor' => 'middle',
+                    'anchor' => $horizontal ? 'middle' : self::anchorWithin($labelPosition, $shortened[$position]),
                 ];
             }
         }
@@ -113,7 +114,11 @@ final class ChartGeometry
             'horizontal' => $horizontal,
             'baseline' => $valueAxis(0.0),
             'plot' => $plot,
-            'ticks' => array_map(fn (float $tick, string $label): array => ['position' => $valueAxis($tick), 'label' => $label], $ticks, ChartScale::compactAll($ticks)),
+            'ticks' => array_map(
+                fn (float $tick, string $label): array => ['position' => $valueAxis($tick), 'label' => $label, 'anchor' => $horizontal ? self::anchorWithin($valueAxis($tick), $label) : 'middle'],
+                $ticks,
+                ChartScale::compactAll($ticks),
+            ),
             'labels' => $labels,
             'bars' => $bars,
         ];

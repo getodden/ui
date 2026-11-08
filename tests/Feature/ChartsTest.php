@@ -358,6 +358,8 @@ it('renders a stat with its label, value and delta direction as text', function 
     'inferred down' => ['-3%', null, 'Down', 'text-rose-700'],
     'inferred down with a minus sign' => ['−3%', null, 'Down', 'text-rose-700'],
     'inferred flat' => ['0%', null, 'No change', 'text-gray-600'],
+    'inferred flat with a plus sign' => ['+0%', null, 'No change', 'text-gray-600'],
+    'inferred flat with a minus sign' => ['-0.0%', null, 'No change', 'text-gray-600'],
     'explicit down' => ['4%', 'down', 'Down', 'text-rose-700'],
     'unknown direction falls back to the sign' => ['+4%', 'sideways', 'Up', 'text-emerald-700'],
 ]);
@@ -624,6 +626,20 @@ it('keeps the last line-chart label inside the drawing', function (): void {
 
     expect($labels[0]['anchor'])->toBe('middle')
         ->and($labels[2]['anchor'])->toBe('end');
+});
+
+it('keeps the last vertical bar label inside the drawing', function (): void {
+    $names = array_map(fn (int $year): string => 'September '.$year, range(2000, 2012));
+    $labels = ChartGeometry::bars($names, [chartSeries('S', array_fill(0, 13, 1))], false, false)['labels'];
+
+    expect(end($labels)['anchor'])->toBe('end');
+});
+
+it('keeps the last horizontal bar tick label inside the drawing', function (): void {
+    $ticks = ChartGeometry::bars(['A'], [chartSeries('S', [1_000_000_000_000_000])], true, false)['ticks'];
+
+    expect(end($ticks)['anchor'])->toBe('end')
+        ->and($ticks[0]['anchor'])->toBe('middle');
 });
 
 it('thins vertical bar labels that are too wide to sit side by side', function (): void {
