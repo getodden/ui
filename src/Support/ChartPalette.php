@@ -6,11 +6,13 @@ namespace Odden\Ui\Support;
 
 final class ChartPalette
 {
+    public const int SIZE = 6;
+
     private const array FALLBACKS = ['#6d28d9', '#0f766e', '#b45309', '#be123c', '#0369a1', '#4d7c0f'];
 
     public static function size(): int
     {
-        return count(self::FALLBACKS);
+        return self::SIZE;
     }
 
     public static function paint(int $index): string

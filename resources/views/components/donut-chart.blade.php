@@ -7,11 +7,13 @@
         'A ui::donut-chart needs a label.'
     );
 
-    $segments = collect(is_array($segments) ? array_slice(array_values($segments), 0, \Odden\Ui\Support\ChartData::MAXIMUM_SERIES) : [])
+    $segments = collect(is_array($segments) ? array_values($segments) : [])
         ->filter(fn (mixed $segment): bool => is_array($segment))
         ->map(fn (array $segment): array => ['label' => trim(\Odden\Ui\Support\ChartData::text($segment['label'] ?? '')), 'value' => \Odden\Ui\Support\ChartData::number($segment['value'] ?? null) ?? 0.0])
         ->filter(fn (array $segment): bool => $segment['value'] > 0)
+        ->take(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES)
         ->values()
+        ->map(fn (array $segment, int $index): array => ['label' => $segment['label'] !== '' ? $segment['label'] : __('ui::ui.chart.segment', ['number' => $index + 1]), 'value' => $segment['value']])
         ->all();
     $hasData = $segments !== [];
     $chartId = $attributes->get('id') ?? 'ui-chart-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));

@@ -8,7 +8,7 @@ final class ChartData
 {
     public const int MAXIMUM_CATEGORIES = 366;
 
-    public const int MAXIMUM_SERIES = 12;
+    public const int MAXIMUM_SERIES = ChartPalette::SIZE;
 
     public static function number(mixed $value): ?float
     {

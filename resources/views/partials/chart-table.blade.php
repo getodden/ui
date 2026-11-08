@@ -1,5 +1,5 @@
 @if ($togglable)
-    <button type="button" aria-controls="{{ $tableId }}" aria-expanded="false" x-bind:aria-expanded="tableOpen" x-on:click="tableOpen = ! tableOpen" x-text="tableOpen ? {{ \Illuminate\Support\Js::from(__('ui::ui.chart.hide_table')) }} : {{ \Illuminate\Support\Js::from(__('ui::ui.chart.show_table')) }}" class="rounded-control text-sm font-medium text-primary-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:text-primary-400 dark:focus-visible:outline-primary-400">{{ __('ui::ui.chart.show_table') }}</button>
+    <button type="button" aria-controls="{{ $tableId }}" aria-expanded="false" x-bind:aria-expanded="tableOpen" x-on:click="tableOpen = ! tableOpen" class="rounded-control text-sm font-medium text-primary-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:text-primary-400 dark:focus-visible:outline-primary-400"><span x-text="tableOpen ? {{ \Illuminate\Support\Js::from(__('ui::ui.chart.hide_table')) }} : {{ \Illuminate\Support\Js::from(__('ui::ui.chart.show_table')) }}">{{ __('ui::ui.chart.show_table') }}</span><span class="sr-only">, {{ $caption }}</span></button>
 @endif
 
 <div id="{{ $tableId }}" class="sr-only" @if ($togglable) x-bind:class="{ 'sr-only': ! tableOpen }" @endif>

@@ -57,6 +57,7 @@ return [
         'empty' => 'No data to show',
         'value' => 'Value',
         'series' => 'Series :number',
+        'segment' => 'Segment :number',
         'category' => 'Category',
         'share' => 'Share',
         'total' => 'Total',
