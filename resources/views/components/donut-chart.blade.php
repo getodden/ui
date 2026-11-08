@@ -14,7 +14,7 @@
         ->values();
     $overflow = $segments->count() > \Odden\Ui\Support\ChartData::MAXIMUM_SERIES ? $segments->slice(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES - 1) : collect();
     $segments = $segments->take(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES - ($overflow->isEmpty() ? 0 : 1))
-        ->when($overflow->isNotEmpty(), fn ($kept) => $kept->push(['label' => __('ui::ui.chart.other'), 'value' => (float) $overflow->sum('value')]))
+        ->when($overflow->isNotEmpty(), fn (\Illuminate\Support\Collection $kept): \Illuminate\Support\Collection => $kept->push(['label' => __('ui::ui.chart.other'), 'value' => (float) $overflow->sum('value')]))
         ->map(fn (array $segment, int $index): array => ['label' => $segment['label'] !== '' ? $segment['label'] : __('ui::ui.chart.segment', ['number' => $index + 1]), 'value' => $segment['value']])
         ->all();
     $hasData = $segments !== [];

@@ -35,7 +35,7 @@
             @endforeach
 
             @foreach ($geometry['labels'] as $axisLabel)
-                <text x="{{ $axisLabel['position'] }}" y="{{ $plot['bottom'] + 16 }}" text-anchor="middle" font-size="11" class="fill-gray-600 dark:fill-gray-400"><title>{{ $axisLabel['full'] }}</title>{{ $axisLabel['text'] }}</text>
+                <text x="{{ $axisLabel['position'] }}" y="{{ $plot['bottom'] + 16 }}" text-anchor="{{ $axisLabel['anchor'] }}" font-size="11" class="fill-gray-600 dark:fill-gray-400"><title>{{ $axisLabel['full'] }}</title>{{ $axisLabel['text'] }}</text>
             @endforeach
 
             @foreach ($geometry['lines'] as $line)

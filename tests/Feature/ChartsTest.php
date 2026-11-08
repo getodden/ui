@@ -262,12 +262,52 @@ it('reads numbers and refuses what is not finite', function (): void {
         ->and(ChartData::number([1]))->toBeNull();
 });
 
-it('caps the number of categories and series', function (): void {
-    $categories = ChartData::categories(range(1, 1000));
-    $series = ChartData::series(array_fill(0, 30, ['values' => [1]]), 1);
+it('accepts the most categories and series and refuses more', function (): void {
+    expect(ChartData::categories(range(1, ChartData::MAXIMUM_CATEGORIES)))->toHaveCount(ChartData::MAXIMUM_CATEGORIES)
+        ->and(ChartData::series(array_fill(0, ChartData::MAXIMUM_SERIES, ['values' => [1]]), 1))->toHaveCount(ChartData::MAXIMUM_SERIES)
+        ->and(fn () => ChartData::categories(range(1, ChartData::MAXIMUM_CATEGORIES + 1)))->toThrow(InvalidArgumentException::class, 'at most 366 categories')
+        ->and(fn () => ChartData::series(array_fill(0, ChartData::MAXIMUM_SERIES + 1, ['values' => [1]]), 1))->toThrow(InvalidArgumentException::class, 'at most 6 series');
+});
 
-    expect($categories)->toHaveCount(ChartData::MAXIMUM_CATEGORIES)
-        ->and($series)->toHaveCount(ChartData::MAXIMUM_SERIES);
+it('refuses a chart with more data than it can draw instead of dropping it', function (string $template): void {
+    Html::render($template, ['many' => range(1, ChartData::MAXIMUM_CATEGORIES + 1), 'series' => array_fill(0, ChartData::MAXIMUM_SERIES + 1, ['values' => [1]])]);
+})->with([
+    '<x-ui::line-chart label="L" :categories="$many" :series="[[\'values\' => [1]]]" />',
+    '<x-ui::bar-chart label="L" :categories="[\'a\']" :series="$series" />',
+    '<x-ui::sparkline label="L" :values="$many" />',
+])->throws(ViewException::class, 'at most');
+
+it('gives charts with the same label different ids', function (): void {
+    $dom = Html::render('<x-ui::bar-chart label="Revenue" :categories="[\'a\']" :series="[[\'values\' => [1]]]" /><x-ui::bar-chart label="Revenue" :categories="[\'a\']" :series="[[\'values\' => [2]]]" /><x-ui::stat label="Revenue" value="1" :sparkline="[1, 2]" /><x-ui::stat label="Revenue" value="1" :sparkline="[1, 2]" />');
+
+    $ids = array_map(fn ($node): string => $node->getAttribute('id'), iterator_to_array($dom->querySelectorAll('[id]')));
+
+    expect($ids)->not->toBeEmpty()
+        ->and(array_unique($ids))->toHaveCount(count($ids));
+});
+
+it('keeps an id the caller passes', function (): void {
+    $dom = Html::render('<x-ui::bar-chart id="mine" label="L" :categories="[\'a\']" :series="[[\'values\' => [1]]]" />');
+
+    expect($dom->querySelector('figure')->getAttribute('id'))->toBe('mine');
+});
+
+it('treats a vanishingly small value as zero so the axis still draws', function (): void {
+    $dom = Html::render('<x-ui::bar-chart label="L" :categories="[\'a\', \'b\']" :series="[[\'values\' => [0, 5e-324]]]" />');
+
+    expect(ChartData::number(5e-324))->toBe(0.0)
+        ->and(ChartData::number(1e-10))->toBe(0.0)
+        ->and(ChartData::number(0.001))->toBe(0.001)
+        ->and($dom->querySelector('svg'))->not->toBeNull();
+});
+
+it('keeps tick labels at the largest supported magnitude inside the left gutter', function (): void {
+    $geometry = ChartGeometry::lines(['a', 'b'], [chartSeries('S', [-1e15, 1e15])]);
+    $widest = max(array_map(fn (array $tick): int => strlen($tick['label']), $geometry['ticks']));
+
+    expect(ChartScale::compact(1e15))->toBe('1,000T')
+        ->and(ChartScale::compact(1e12))->toBe('1T')
+        ->and($widest * 6.2)->toBeLessThan($geometry['plot']['left'] - 6);
 });
 
 it('names unnamed series', function (): void {
@@ -486,7 +526,11 @@ it('ignores numbers too large to chart without failing the render', function ():
 });
 
 it('keeps the same chart id across renders so Livewire can morph the chart', function (string $template): void {
-    $ids = array_map(fn (): string => Html::render($template)->querySelector('figure')->getAttribute('id'), [1, 2]);
+    $ids = array_map(function () use ($template): string {
+        app()->forgetScopedInstances();
+
+        return Html::render($template)->querySelector('figure')->getAttribute('id');
+    }, [1, 2]);
 
     expect($ids[0])->toBe($ids[1])->and($ids[0])->toStartWith('ui-chart-');
 })->with([
@@ -542,6 +586,14 @@ it('reads the direction of a numeric stat delta from its sign', function (float|
     'positive numeric string' => ['4.5', 'Up'],
 ]);
 
+it('leaves the direction of an unsigned non-numeric stat delta unsaid', function (string $delta): void {
+    $deltaText = Html::render('<x-ui::stat label="Growth" value="9" :delta="$delta" />', ['delta' => $delta])->querySelectorAll('dd')[1];
+
+    expect($deltaText->querySelectorAll('.sr-only'))->toHaveCount(0)
+        ->and($deltaText->querySelector('svg'))->toBeNull()
+        ->and($deltaText->textContent)->toContain($delta);
+})->with(['12%', '$1.2k']);
+
 it('says in text whether a stat change is favourable', function (string $attributes, ?string $word): void {
     $deltaText = Html::render('<x-ui::stat label="Churn" value="2%" delta="-0.4%" '.$attributes.' />')->querySelectorAll('dd')[1];
     $spoken = array_map(fn ($node): string => $node->textContent, iterator_to_array($deltaText->querySelectorAll('.sr-only')));
@@ -552,3 +604,33 @@ it('says in text whether a stat change is favourable', function (string $attribu
     'bad' => ['sentiment="negative"', 'Unfavourable'],
     'neutral' => ['sentiment="neutral"', null],
 ]);
+
+it('declares the dark chart palette so it beats the root palette on the html element', function (): void {
+    $css = file_get_contents(__DIR__.'/../../resources/css/theme.css');
+
+    expect($css)->toMatch('/^\.dark \{\s*--ui-chart-1/m')
+        ->and($css)->not->toMatch('/:where\(\.dark\)\s*\{\s*--ui-chart/');
+});
+
+it('compacts a narrow range of large ticks so the labels stay short', function (): void {
+    $labels = ChartScale::compactAll(ChartScale::ticks(1201000, 1204000));
+
+    expect($labels[0])->toBe('1.201M')
+        ->and(max(array_map('strlen', $labels)))->toBeLessThanOrEqual(7);
+});
+
+it('keeps the last line-chart label inside the drawing', function (): void {
+    $labels = ChartGeometry::lines(['Oct 2026', 'Nov 2026', 'Dec 2026'], [chartSeries('S', [1, 2, 3])])['labels'];
+
+    expect($labels[0]['anchor'])->toBe('middle')
+        ->and($labels[2]['anchor'])->toBe('end');
+});
+
+it('thins vertical bar labels that are too wide to sit side by side', function (): void {
+    $names = ['Qualification', 'Proposal sent', 'Contract sent', 'Negotiation', 'Closed won', 'Closed lost', 'On hold', 'Nurture'];
+    $geometry = ChartGeometry::bars($names, [chartSeries('S', array_fill(0, 8, 1))], false, false);
+    $band = ($geometry['plot']['right'] - $geometry['plot']['left']) / 8;
+
+    expect(count($geometry['labels']))->toBeLessThan(8)
+        ->and($band * (8 / count($geometry['labels'])))->toBeGreaterThan(70);
+});

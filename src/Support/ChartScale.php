@@ -56,9 +56,17 @@ final class ChartScale
         return in_array($trimmed, ['-0', ''], true) ? '0' : $trimmed;
     }
 
+    private static function trimmed(float $value, int $decimals): string
+    {
+        $formatted = number_format($value, $decimals, '.', ',');
+        $trimmed = str_contains($formatted, '.') ? rtrim(rtrim($formatted, '0'), '.') : $formatted;
+
+        return in_array($trimmed, ['-0', ''], true) ? '0' : $trimmed;
+    }
+
     public static function compact(float $value, int $decimals = 1): string
     {
-        $units = [1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'K'];
+        $units = [1_000_000_000_000 => 'T', 1_000_000_000 => 'B', 1_000_000 => 'M', 1_000 => 'K'];
         $absolute = abs($value);
 
         foreach ($units as $threshold => $suffix) {
@@ -68,11 +76,11 @@ final class ChartScale
 
             $scaled = round($value / $threshold, $decimals);
 
-            if (abs($scaled) >= 1000 && $threshold < 1_000_000_000) {
+            if (abs($scaled) >= 1000 && $threshold < 1_000_000_000_000) {
                 return self::compact($scaled * $threshold, $decimals);
             }
 
-            return self::format($scaled).$suffix;
+            return self::trimmed($scaled, $decimals).$suffix;
         }
 
         return self::format($value);

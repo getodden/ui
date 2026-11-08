@@ -10,7 +10,8 @@ it('has no accessibility issues with the charts in dark mode', function (): void
     $page = visit('/');
     $page->script('document.documentElement.classList.add("dark"); document.body.replaceChildren(document.querySelector("[aria-labelledby=charts-demo-heading]"))');
 
-    $page->assertNoJavaScriptErrors()->assertNoAccessibilityIssues();
+    $page->assertNoJavaScriptErrors()->assertNoAccessibilityIssues()
+        ->assertScript('getComputedStyle(document.documentElement).getPropertyValue("--ui-chart-1").trim() === "#a78bfa"');
 });
 
 it('keeps the chart data table hidden until the toggle opens it', function (): void {

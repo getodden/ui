@@ -12,6 +12,8 @@ final class ChartData
 
     public const float MAXIMUM_MAGNITUDE = 1e15;
 
+    public const float MINIMUM_MAGNITUDE = 1e-9;
+
     public static function number(mixed $value): ?float
     {
         $number = match (true) {
@@ -20,12 +22,25 @@ final class ChartData
             default => null,
         };
 
-        return $number !== null && is_finite($number) && abs($number) <= self::MAXIMUM_MAGNITUDE ? $number : null;
+        if ($number === null || ! is_finite($number) || abs($number) > self::MAXIMUM_MAGNITUDE) {
+            return null;
+        }
+
+        return abs($number) < self::MINIMUM_MAGNITUDE ? 0.0 : $number;
     }
 
     public static function identifier(string $kind, string $label): string
     {
-        return 'ui-chart-'.substr(hash('xxh3', $kind.'|'.$label), 0, 8);
+        return app(ChartIdentifiers::class)->next($kind, $label);
+    }
+
+    public static function within(int $count, int $maximum, string $what): void
+    {
+        throw_if(
+            $count > $maximum,
+            \InvalidArgumentException::class,
+            sprintf('A chart takes at most %d %s, %d given.', $maximum, $what, $count)
+        );
     }
 
     public static function text(mixed $value): string
@@ -42,7 +57,9 @@ final class ChartData
             return [];
         }
 
-        return array_map(self::text(...), array_slice(array_values($categories), 0, self::MAXIMUM_CATEGORIES));
+        self::within(count($categories), self::MAXIMUM_CATEGORIES, 'categories');
+
+        return array_map(self::text(...), array_values($categories));
     }
 
     /**
@@ -54,7 +71,8 @@ final class ChartData
             return [];
         }
 
-        $series = array_slice(array_values(array_filter($series, is_array(...))), 0, self::MAXIMUM_SERIES);
+        $series = array_values(array_filter($series, is_array(...)));
+        self::within(count($series), self::MAXIMUM_SERIES, 'series');
         $normalised = [];
 
         foreach ($series as $index => $entry) {

@@ -8,11 +8,17 @@ final class ChartGeometry
 {
     private const float WIDTH = 480.0;
 
+    private const float VALUE_GUTTER = 56.0;
+
     private const float VERTICAL_HEIGHT = 240.0;
 
     private const float HORIZONTAL_BAND = 14.0;
 
     private const int LABEL_LENGTH = 14;
+
+    private const float CHARACTER_WIDTH = 6.2;
+
+    private const float LABEL_GAP = 8.0;
 
     /**
      * @param  list<string>  $categories
@@ -45,7 +51,7 @@ final class ChartGeometry
         $height = $horizontal ? 8.0 + 24.0 + $count * $bandSize : self::VERTICAL_HEIGHT;
         $plot = $horizontal
             ? ['left' => 96.0, 'right' => self::WIDTH - 16.0, 'top' => 8.0, 'bottom' => $height - 24.0]
-            : ['left' => 48.0, 'right' => self::WIDTH - 8.0, 'top' => 8.0, 'bottom' => $height - 28.0];
+            : ['left' => self::VALUE_GUTTER, 'right' => self::WIDTH - 8.0, 'top' => 8.0, 'bottom' => $height - 28.0];
 
         $valueAxis = fn (float $value): float => $horizontal
             ? ChartScale::coordinate($value, $domainMinimum, $domainMaximum, $plot['left'], $plot['right'])
@@ -86,15 +92,17 @@ final class ChartGeometry
             }
         }
 
-        $step = $horizontal ? 1 : self::labelStep($count, $plot['right'] - $plot['left'], 48.0);
+        $shortened = array_map(self::shorten(...), $categories);
+        $step = $horizontal ? 1 : self::labelStep($count, $plot['right'] - $plot['left'], self::widestLabel($shortened));
         $labels = [];
 
         foreach ($categories as $position => $category) {
             if ($position % $step === 0) {
                 $labels[] = [
                     'position' => round(($horizontal ? $plot['top'] : $plot['left']) + ($position + 0.5) * $bandLength, 2),
-                    'text' => self::shorten($category),
+                    'text' => $shortened[$position],
                     'full' => $category,
+                    'anchor' => 'middle',
                 ];
             }
         }
@@ -119,7 +127,7 @@ final class ChartGeometry
     public static function lines(array $categories, array $series): array
     {
         $count = count($categories);
-        $plot = ['left' => 48.0, 'right' => self::WIDTH - 12.0, 'top' => 12.0, 'bottom' => self::VERTICAL_HEIGHT - 28.0];
+        $plot = ['left' => self::VALUE_GUTTER, 'right' => self::WIDTH - 12.0, 'top' => 12.0, 'bottom' => self::VERTICAL_HEIGHT - 28.0];
 
         $present = [];
 
@@ -180,12 +188,19 @@ final class ChartGeometry
             $lines[] = ['series' => $seriesIndex, 'path' => $path === [] ? null : implode(' ', $path), 'points' => $points];
         }
 
-        $step = self::labelStep($count, $plot['right'] - $plot['left'], 48.0);
+        $shortened = array_map(self::shorten(...), $categories);
+        $step = self::labelStep($count, $plot['right'] - $plot['left'], self::widestLabel($shortened));
         $labels = [];
 
         foreach ($categories as $position => $category) {
             if ($position % $step === 0) {
-                $labels[] = ['position' => $horizontalAt($position), 'text' => self::shorten($category), 'full' => $category];
+                $labelPosition = $horizontalAt($position);
+                $labels[] = [
+                    'position' => $labelPosition,
+                    'text' => $shortened[$position],
+                    'full' => $category,
+                    'anchor' => self::anchorWithin($labelPosition, $shortened[$position]),
+                ];
             }
         }
 
@@ -359,6 +374,30 @@ final class ChartGeometry
     private static function labelStep(int $count, float $length, float $minimumSpacing): int
     {
         return (int) max(1, ceil($count / max(1, floor($length / $minimumSpacing))));
+    }
+
+    /**
+     * @param  list<string>  $labels
+     */
+    private static function widestLabel(array $labels): float
+    {
+        return max(48.0, ...array_map(fn (string $label): float => self::textWidth($label) + self::LABEL_GAP, $labels));
+    }
+
+    private static function textWidth(string $text): float
+    {
+        return mb_strlen($text) * self::CHARACTER_WIDTH;
+    }
+
+    private static function anchorWithin(float $position, string $text): string
+    {
+        $half = self::textWidth($text) / 2;
+
+        return match (true) {
+            $position + $half > self::WIDTH => 'end',
+            $position - $half < 0 => 'start',
+            default => 'middle',
+        };
     }
 
     private static function shorten(string $text): string

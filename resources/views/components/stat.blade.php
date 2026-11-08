@@ -13,7 +13,8 @@
         is_numeric($delta) && (float) $delta < 0 => 'down',
         str_starts_with(trim((string) $delta), '+') => 'up',
         str_starts_with(trim((string) $delta), '-'), str_starts_with(trim((string) $delta), '−') => 'down',
-        default => 'flat',
+        preg_match('/^[+\-−]?0+([.,]0+)?\s*%?$/u', trim((string) $delta)) === 1 => 'flat',
+        default => null,
     };
     $sentiment = in_array($sentiment, ['positive', 'negative', 'neutral'], true) ? $sentiment : match ($direction) {
         'up' => 'positive',
@@ -28,7 +29,8 @@
     $deltaIcon = match ($direction) {
         'up' => 'fas-arrow-up',
         'down' => 'fas-arrow-down',
-        default => 'fas-minus',
+        'flat' => 'fas-minus',
+        default => null,
     };
     $hasSparkline = is_array($sparkline) && $sparkline !== [];
 @endphp
@@ -40,8 +42,10 @@
         @if ($hasDelta)
             <dd class="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm">
                 <span class="inline-flex items-center gap-1 font-medium {{ $deltaClasses }}">
-                    <x-ui::icon :name="$deltaIcon" size="sm" />
-                    <span class="sr-only">{{ __('ui::ui.chart.'.$direction) }}</span>
+                    @if ($deltaIcon !== null)
+                        <x-ui::icon :name="$deltaIcon" size="sm" />
+                        <span class="sr-only">{{ __('ui::ui.chart.'.$direction) }}</span>
+                    @endif
                     <span class="tabular-nums">{{ $delta }}</span>
                     @if ($sentiment !== 'neutral')
                         <span class="sr-only">{{ __('ui::ui.chart.'.($sentiment === 'positive' ? 'favourable' : 'unfavourable')) }}</span>
