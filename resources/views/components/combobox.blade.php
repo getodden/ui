@@ -41,6 +41,7 @@
                 this.value = this.$root.dataset.value
                 this.ownValue = this.$root.dataset.value
                 this.query = this.$root.dataset.label
+                new MutationObserver(() => this.query = this.$root.dataset.label).observe(this.$root, { attributes: true, attributeFilter: ['data-label'] })
                 this.$watch('value', (value) => {
                     if (String(value ?? '') === this.ownValue) return
                     this.ownValue = String(value ?? '')

@@ -150,7 +150,7 @@ it('drops the reply to an earlier search while a newer one is still waiting to s
     expect($seen)->toBe([]);
 });
 
-it('shows the label of a combobox that is re-keyed with a new value', function (): void {
+it('shows the new label when the server changes a combobox value and its label', function (): void {
     $page = visit('/');
 
     $page->click('#forms-assign');

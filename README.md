@@ -97,13 +97,13 @@ Two checkboxes bound to the same key get the same id, so give one an explicit `i
 
 `multiselect` follows the select-only combobox pattern: the button holds focus, arrows move the highlighted option, Space and Enter toggle it, Escape closes the list. It writes strings once the visitor toggles an option, so a property that holds integers comes back as strings. With a `name` (and no `wire:model`) it posts `name[]` fields.
 
-`combobox` calls a public method of your component with what the visitor typed, after a pause, and shows what it returns as options. The method returns `[['id' => '7', 'label' => 'Ada']]`. Only the latest search is shown. Anyone can call that method with any string, so authorise inside it, cap the query length and the number of results, return only `id` and `label`, and mark it `#[Renderless]`. If your application refuses every component method that is not marked as a read while a session is read-only or a workspace is locked, mark the search method as a read too, or every search is refused there:
+`combobox` calls a public method of your component with what the visitor typed, after a pause, and shows what it returns as options. The method returns `[['id' => '7', 'label' => 'Ada']]`. Only the latest search is shown. Anyone can call that method with any string, so authorise inside it, cap the query length and the number of results, return only `id` and `label`, and mark it `#[Renderless]`. The bound value can be set to any id from the browser, so resolve it through the same scoped query when you use it; never trust that it came from your search method. The same goes for `multiselect` values. If your application refuses every component method that is not marked as a read while a session is read-only or a workspace is locked, mark the search method as a read too, or every search is refused there:
 
 ```blade
 <x-ui::combobox label="Customer" wire:model="customerId" search="searchCustomers" :value-label="$customerName" />
 ```
 
-The bound value is the chosen `id`, or an empty string while the text is edited or nothing is chosen. Text that matches no choice is cleared when focus leaves the field. `value-label` is the text to show for a value that is already set; it is read once, so change the property and the label together by re-rendering the component with a new `wire:key` on the combobox. The `search` value must be a plain method name.
+The bound value is the chosen `id`, or an empty string while the text is edited or nothing is chosen. Text that matches no choice is cleared when focus leaves the field. `value-label` is the text to show for a value that is already set; change the property and the label together and the field shows the new label without being replaced, so focus is kept. The `search` value must be a plain method name.
 
 ### Layout pieces
 
@@ -117,13 +117,13 @@ The bound value is the chosen `id`, or an empty string while the text is edited 
     </x-slot:actions>
 </x-ui::page-header>
 
-<x-ui::tabs id="contact-tabs" label="Contact sections" wire:model="tab" :tabs="['details' => 'Details', 'notes' => 'Notes']">
+<x-ui::tabs id="contact-tabs" label="Contact sections" wire:model="tab" :selected="$tab" :tabs="['details' => 'Details', 'notes' => 'Notes']">
     <x-ui::tab name="details">...</x-ui::tab>
     <x-ui::tab name="notes">...</x-ui::tab>
 </x-ui::tabs>
 ```
 
-The last breadcrumb is the current page. `tabs` activates a tab as soon as it gets focus with the arrow keys, Home or End; all panels are rendered and hidden with CSS, so state inside them is kept. The dropdown is the menu-button pattern: Enter, Space or the arrow keys open it onto the first (or with Up, the last) item; arrows, Home, End and the first letter of an item move focus; Escape, Tab, an outside click or choosing an item closes it. A `disabled` item is skipped by the keyboard. Give `<x-ui::dropdown>` an `id` when a test or label needs a stable one; the button is then `{id}-trigger`.
+The last breadcrumb is the current page. `tabs` activates a tab as soon as it gets focus with the arrow keys, Home or End; all panels are rendered and hidden with CSS, so state inside them is kept. The dropdown is the menu-button pattern: Enter, Space or the arrow keys open it onto the first (or with Up, the last) item; arrows, Home, End and the first letter of an item move focus; Escape, Tab, an outside click or choosing an item closes it. A `disabled` item is skipped by the keyboard. Give `<x-ui::dropdown>` an `id` when a test or label needs a stable one; the button is then `{id}-trigger`. Without one, the ids come from the label, the `wire:key` and the content, so identical dropdowns, collapsibles or cards on one page need an `id` or a different `wire:key`. Pass `:selected` with `wire:model` on tabs so the server renders the bound tab.
 
 ### Modal
 

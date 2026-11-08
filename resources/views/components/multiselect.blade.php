@@ -10,7 +10,7 @@
     $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
     $triggerAttributes = $field->controlAttributes($attributes->whereDoesntStartWith(['wire:model', 'wire:key']), $required)->except(['name', 'required'])->class(["flex w-full items-center justify-between gap-2 rounded-control border bg-white px-3 py-2 text-left text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400", $borderClasses]);
     $triggerAttributes = $required ? $triggerAttributes->merge(['aria-required' => 'true']) : $triggerAttributes;
-    $triggerAttributes = filled($label) ? $triggerAttributes->merge(['aria-labelledby' => $labelId.' '.$summaryId]) : $triggerAttributes;
+    $triggerAttributes = filled($label) ? $triggerAttributes->merge(['aria-labelledby' => $labelId.' '.$summaryId]) : ($attributes->has('aria-label') && ! $attributes->has('aria-labelledby') ? $triggerAttributes->merge(['aria-labelledby' => $field->id.' '.$summaryId]) : $triggerAttributes);
 @endphp
 
 <x-ui::field :id="$field->id" :label="$label" :hint="$hint" :error="$field->error" :required="$required" identified>

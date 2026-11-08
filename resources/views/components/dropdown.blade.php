@@ -3,7 +3,7 @@
 @php
     throw_if(blank($label), \InvalidArgumentException::class, 'A ui::dropdown needs a label.');
 
-    $baseId = filled($id) ? $id : 'ui-dropdown-'.substr(sha1((string) $label), 0, 10);
+    $baseId = filled($id) ? $id : 'ui-dropdown-'.substr(sha1($label.'|'.$attributes->get('wire:key').'|'.$slot), 0, 10);
     $alignClasses = $align === 'end' ? 'right-0' : 'left-0';
 @endphp
 

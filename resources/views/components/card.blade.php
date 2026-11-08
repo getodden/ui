@@ -4,7 +4,7 @@
     $hasHeading = filled(trim((string) $heading));
     $hasFooter = filled(trim((string) $footer));
     $headingTag = 'h'.min(6, max(1, (int) $level));
-    $headingId = 'ui-card-'.substr(sha1((string) $heading), 0, 10);
+    $headingId = filled($attributes->get('id')) ? $attributes->get('id').'-heading' : 'ui-card-'.substr(sha1($heading.'|'.$attributes->get('wire:key').'|'.$slot), 0, 10);
 @endphp
 
 <section @if ($hasHeading) aria-labelledby="{{ $headingId }}" @endif {{ $attributes->class(['rounded-surface border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100']) }}>

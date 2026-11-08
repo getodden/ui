@@ -437,3 +437,30 @@ it('shows the first tab panel when the selected tab does not exist', function ()
 it('refuses an id on a tab', function (): void {
     Html::render('<x-ui::tabs id="t" label="x" :tabs="[\'a\' => \'A\']"><x-ui::tab name="a" id="own">x</x-ui::tab></x-ui::tabs>');
 })->throws(ViewException::class, 'takes its id from the tabs');
+
+it('gives dropdowns, collapsibles and cards that share a label different ids when their content differs', function (): void {
+    $dom = Html::render('
+        <x-ui::dropdown label="Actions" icon-only><x-ui::dropdown.item wire:click="edit(1)">Edit</x-ui::dropdown.item></x-ui::dropdown>
+        <x-ui::dropdown label="Actions" icon-only><x-ui::dropdown.item wire:click="edit(2)">Edit</x-ui::dropdown.item></x-ui::dropdown>
+        <x-ui::collapsible heading="Notes">One</x-ui::collapsible>
+        <x-ui::collapsible heading="Notes">Two</x-ui::collapsible>
+        <x-ui::card heading="Notes">One</x-ui::card>
+        <x-ui::card heading="Notes">Two</x-ui::card>
+    ');
+
+    $ids = array_map(fn ($element): string => $element->getAttribute('id'), iterator_to_array($dom->querySelectorAll('[id]')));
+
+    expect($ids)->toHaveCount(count(array_unique($ids)));
+});
+
+it('keeps default ids the same between renders', function (): void {
+    $template = '<x-ui::dropdown label="Actions"><x-ui::dropdown.item>Edit</x-ui::dropdown.item></x-ui::dropdown>';
+
+    expect(Html::render($template)->querySelector('button')->getAttribute('id'))->toBe(Html::render($template)->querySelector('button')->getAttribute('id'));
+});
+
+it('names a multiselect with only an aria-label by that label and its summary', function (): void {
+    $trigger = Html::render('<x-ui::multiselect aria-label="Tags" wire:model="tags" :options="[\'a\' => \'A\']" />')->querySelector('button[role=combobox]');
+
+    expect($trigger->getAttribute('aria-labelledby'))->toBe($trigger->getAttribute('id').' '.$trigger->getAttribute('id').'-summary');
+});
