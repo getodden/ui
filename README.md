@@ -45,6 +45,11 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::board>` | `label` (required unless you pass `aria-label` or `aria-labelledby`), `columns` (key => label, offered in each card's Move to select) |
 | `<x-ui::board.column>` | `column` (key), `label`, `count`, `total` (text, optional), `has-more` |
 | `<x-ui::board.card>` | `id`, `label` |
+| `<x-ui::bar-chart>` | `label` (required, names the chart), `label-visible`, `categories`, `series`, `orientation` vertical or horizontal, `stacked` |
+| `<x-ui::line-chart>` | `label`, `label-visible`, `categories`, `series` |
+| `<x-ui::sparkline>` | `label` (required), `values` |
+| `<x-ui::donut-chart>` | `label`, `label-visible`, `segments` |
+| `<x-ui::stat>` | `label` (required), `value`, `delta`, `direction` up, down or flat, `sentiment` positive, negative or neutral, `delta-label`, `sparkline` (list of values) |
 | `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
@@ -165,6 +170,19 @@ Set `:reorderable="false"` on the board when the query decides the order: the up
 ```
 
 Sortable headers are buttons, and the sorted column carries `aria-sort`. When there are no records, the table shows the `empty` slot. While a request runs, it is marked `aria-busy`. Pagination links appear when there is more than one page.
+
+### Charts
+
+Charts are server-rendered SVG with no JavaScript library. Data is plain arrays: `categories` is a list of labels and `series` a list of `['name' => 'Won', 'values' => [4, 7, 5]]`, with one value per category. A `null` or non-numeric value is a gap. A donut takes `segments` as a list of `['label' => 'Web', 'value' => 40]`; zero and negative segments are left out.
+
+```blade
+<x-ui::bar-chart label="Deals by month" :categories="['Jan', 'Feb']" :series="[['name' => 'Won', 'values' => [4, 7]], ['name' => 'Lost', 'values' => [2, 3]]]" stacked />
+<x-ui::stat label="New contacts" value="1,248" delta="+12%" delta-label="vs last month" :sparkline="[3, 5, 8, 12]" />
+```
+
+The label is the accessible name (a `figcaption` the SVG is labelled by) and is hidden unless you pass `label-visible`. Every chart also holds its values in a data table that screen readers can reach, and the bar, line and donut charts add a "Show data table" button that reveals it (it needs Alpine, which Livewire bundles). With no data the chart shows "No data to show" instead of an empty plot. A line with one point draws a marker. Chart ids are numbered per request, so pass an `id` to each chart inside a Livewire component, or two charts with the same label can share ids after a partial re-render. Charts take at most 366 categories and 6 series (one per palette colour) and throw an `InvalidArgumentException` for more, rather than dropping data.
+
+Series and segments take their colours in order from `--ui-chart-1` to `--ui-chart-6`, which `theme.css` defines for light and dark; override them to rebrand, and override both the `:root` and the `.dark` declarations, or the dark palette keeps the package colours (or the later `:root` rule wins in dark mode too when `.dark` sits on `<html>`). Colour is never the only carrier: every mark has a tooltip and a row in the table, and the legend names each series. A stat's `direction` is inferred from a leading `+` or `-` in `delta`, from the sign of a numeric one, or from a zero, when you do not pass it (otherwise the tile states no direction), and its colour follows `sentiment` (up is positive, down negative, unless you say otherwise, for example for churn). A donut with more than six segments folds the tail into "Other", and values beyond 1e15 in magnitude are ignored and values below 1e-9 in magnitude count as zero.
 
 ## Livewire traits
 

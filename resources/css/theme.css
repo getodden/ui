@@ -33,6 +33,24 @@
     --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
 }
 
+:root {
+    --ui-chart-1: #6d28d9;
+    --ui-chart-2: #0f766e;
+    --ui-chart-3: #b45309;
+    --ui-chart-4: #be123c;
+    --ui-chart-5: #0369a1;
+    --ui-chart-6: #4d7c0f;
+}
+
+.dark {
+    --ui-chart-1: #a78bfa;
+    --ui-chart-2: #2dd4bf;
+    --ui-chart-3: #fbbf24;
+    --ui-chart-4: #fb7185;
+    --ui-chart-5: #38bdf8;
+    --ui-chart-6: #a3e635;
+}
+
 .ui-editor-content > * + * {
     margin-top: 0.5rem;
 }

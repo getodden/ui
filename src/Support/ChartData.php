@@ -1,0 +1,138 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Odden\Ui\Support;
+
+use Illuminate\Contracts\Support\Arrayable;
+
+final class ChartData
+{
+    public const int MAXIMUM_CATEGORIES = 366;
+
+    public const int MAXIMUM_SERIES = ChartPalette::SIZE;
+
+    public const float MAXIMUM_MAGNITUDE = 1e15;
+
+    public const float MINIMUM_MAGNITUDE = 1e-9;
+
+    public static function number(mixed $value): ?float
+    {
+        $number = match (true) {
+            is_int($value), is_float($value) => (float) $value,
+            is_string($value) && is_numeric($value) => (float) $value,
+            default => null,
+        };
+
+        if ($number === null || ! is_finite($number) || abs($number) > self::MAXIMUM_MAGNITUDE) {
+            return null;
+        }
+
+        return abs($number) < self::MINIMUM_MAGNITUDE ? 0.0 : $number;
+    }
+
+    public static function identifier(string $kind, string $label): string
+    {
+        return app(ChartIdentifiers::class)->next($kind, $label);
+    }
+
+    public static function within(int $count, int $maximum, string $what): void
+    {
+        throw_if(
+            $count > $maximum,
+            \InvalidArgumentException::class,
+            sprintf('A chart takes at most %d %s, %d given.', $maximum, $what, $count)
+        );
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     */
+    public static function items(mixed $input): array
+    {
+        return match (true) {
+            is_array($input) => $input,
+            $input instanceof Arrayable => $input->toArray(),
+            $input instanceof \Traversable => iterator_to_array($input),
+            default => [],
+        };
+    }
+
+    public static function text(mixed $value): string
+    {
+        return is_scalar($value) || $value instanceof \Stringable ? (string) $value : '';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function categories(mixed $categories): array
+    {
+        $categories = self::items($categories);
+
+        self::within(count($categories), self::MAXIMUM_CATEGORIES, 'categories');
+
+        return array_map(self::text(...), array_values($categories));
+    }
+
+    /**
+     * @return list<array{name: string, values: list<float|null>}>
+     */
+    public static function series(mixed $series, int $categoryCount): array
+    {
+        $series = self::items($series);
+
+        if ($series === [] || $categoryCount === 0) {
+            return [];
+        }
+
+        $series = array_values(array_filter(array_map(self::items(...), $series), fn (array $entry): bool => $entry !== []));
+        self::within(count($series), self::MAXIMUM_SERIES, 'series');
+        $normalised = [];
+
+        foreach ($series as $index => $entry) {
+            $values = array_values(self::items($entry['values'] ?? null));
+            $name = trim(self::text($entry['name'] ?? ''));
+
+            $normalised[] = [
+                'name' => $name !== '' ? $name : (count($series) > 1 ? __('ui::ui.chart.series', ['number' => $index + 1]) : __('ui::ui.chart.value')),
+                'values' => array_map(fn (int $position): ?float => self::number($values[$position] ?? null), range(0, $categoryCount - 1)),
+            ];
+        }
+
+        return $normalised;
+    }
+
+    /**
+     * @param  list<array{name: string, values: list<float|null>}>  $series
+     */
+    public static function hasValues(array $series): bool
+    {
+        foreach ($series as $entry) {
+            foreach ($entry['values'] as $value) {
+                if ($value !== null) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>  $categories
+     * @param  list<array{name: string, values: list<float|null>}>  $series
+     * @return list<list<string>>
+     */
+    public static function tableRows(array $categories, array $series): array
+    {
+        return array_map(
+            fn (string $category, int $position): array => [
+                $category,
+                ...array_map(fn (array $entry): string => $entry['values'][$position] === null ? '' : ChartScale::format($entry['values'][$position]), $series),
+            ],
+            $categories,
+            array_keys($categories),
+        );
+    }
+}
