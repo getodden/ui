@@ -1,7 +1,7 @@
 @props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'required' => false, 'symbol' => '$', 'currency' => null])
 
 @php
-    $currencyId = 'ui-currency-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
+    $currencyId = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null)->id.'-currency';
 
     if (filled($currency)) {
         $attributes->setAttributes([...$attributes->getAttributes(), 'aria-describedby' => trim($attributes->get('aria-describedby', '').' '.$currencyId)]);

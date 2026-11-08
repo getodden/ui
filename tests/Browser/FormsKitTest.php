@@ -128,6 +128,49 @@ it('shows only the results of the latest search when an earlier one is slow', fu
     expect($page->script(formsSettled(visibleOptions(CUSTOMER_LISTBOX), 2200)))->toBe(['Ada Lovelace']);
 });
 
+it('drops the reply to an earlier search while a newer one is still waiting to start', function (): void {
+    $page = visit('/');
+
+    $seen = $page->script('(async () => {
+        const input = document.querySelector("'.CUSTOMER.'")
+        const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+        const type = (text) => { input.value = text; input.dispatchEvent(new Event("input", { bubbles: true })) }
+        const seen = []
+        input.focus()
+        type("slow")
+        await wait(500)
+        type("slowx")
+        for (let tick = 0; tick < 40; tick++) {
+            seen.push(...'.visibleOptions(CUSTOMER_LISTBOX).')
+            await wait(20)
+        }
+        return seen
+    })()');
+
+    expect($seen)->toBe([]);
+});
+
+it('shows the label of a combobox that is re-keyed with a new value', function (): void {
+    $page = visit('/');
+
+    $page->click('#forms-assign');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript(FORMS_WIRE.'.assignee === "3"')
+        ->assertScript('document.querySelector("#assignee").value === "Alan Turing"');
+});
+
+it('copes with a multiselect bound to a null value', function (): void {
+    $page = visit('/');
+
+    $page->assertScript('document.querySelector("#unset-tags").textContent.trim() === "Select options"')
+        ->click('#unset-tags');
+    $page->script('document.getElementById("unset-tags-option-0").click()');
+
+    $page->assertScript('JSON.stringify('.FORMS_WIRE.'.unsetTags) === JSON.stringify(["a"])')
+        ->assertScript('document.querySelector("#unset-tags").textContent.trim() === "Alpha"');
+});
+
 it('has no accessibility issues while the combobox list is open', function (): void {
     $page = visit('/');
 

@@ -390,3 +390,50 @@ it('keeps server values out of the x-data of the combobox, multiselect and tabs'
         ->and($tabs->getAttribute('x-data'))->not->toContain('"b"')
         ->and($tabs->getAttribute('data-initial'))->toBe('b');
 });
+
+it('keeps collapsible, dropdown, card and currency ids the same across renders', function (): void {
+    $render = fn (): array => [
+        Html::render('<x-ui::collapsible heading="Advanced">Body</x-ui::collapsible>')->querySelector('button')->getAttribute('id'),
+        Html::render('<x-ui::dropdown label="Actions"><x-ui::dropdown.item>Edit</x-ui::dropdown.item></x-ui::dropdown>')->querySelector('[role=menu]')->getAttribute('id'),
+        Html::render('<x-ui::card heading="Profile">Body</x-ui::card>')->querySelector('section')->getAttribute('aria-labelledby'),
+        Html::render('<x-ui::currency label="Amount" name="amount" currency="EUR" />')->querySelector('input')->getAttribute('aria-describedby'),
+    ];
+
+    expect($render())->toBe($render());
+});
+
+it('anchors a collapsible on the id it is given', function (): void {
+    $dom = Html::render('<x-ui::collapsible id="advanced" heading="Advanced">Body</x-ui::collapsible>');
+
+    expect($dom->querySelector('section')->getAttribute('id'))->toBe('advanced')
+        ->and($dom->getElementById('advanced-trigger')->getAttribute('aria-controls'))->toBe('advanced-panel')
+        ->and($dom->getElementById('advanced-panel')->getAttribute('aria-labelledby'))->toBe('advanced-trigger');
+});
+
+it('puts wire:key on the combobox and multiselect roots instead of the control', function (string $template, string $control): void {
+    $dom = Html::render($template);
+
+    expect($dom->querySelector($control)->hasAttribute('wire:key'))->toBeFalse()
+        ->and($dom->querySelector('[x-data][wire\\:key]'))->not->toBeNull();
+})->with([
+    'combobox' => ['<x-ui::combobox label="Customer" wire:model="customer" wire:key="c-1" search="find" />', 'input[role=combobox]'],
+    'multiselect' => ['<x-ui::multiselect label="Tags" wire:model="tags" wire:key="t-1" :options="[\'a\' => \'A\']" />', 'button[role=combobox]'],
+]);
+
+it('renders the selected tab panel visible and the others hidden', function (): void {
+    $panels = Html::render('<x-ui::tabs id="record" label="Sections" selected="notes" :tabs="[\'details\' => \'Details\', \'notes\' => \'Notes\']"><x-ui::tab name="details">D</x-ui::tab><x-ui::tab name="notes">N</x-ui::tab></x-ui::tabs>')->querySelectorAll('[role=tabpanel]');
+
+    expect($panels[0]->getAttribute('style'))->toContain('display: none')
+        ->and($panels[1]->hasAttribute('style'))->toBeFalse();
+});
+
+it('shows the first tab panel when the selected tab does not exist', function (): void {
+    $panels = Html::render('<x-ui::tabs id="record" label="Sections" selected="gone" :tabs="[\'a\' => \'A\', \'b\' => \'B\']"><x-ui::tab name="a">A</x-ui::tab><x-ui::tab name="b">B</x-ui::tab></x-ui::tabs>')->querySelectorAll('[role=tabpanel]');
+
+    expect($panels[0]->hasAttribute('style'))->toBeFalse()
+        ->and($panels[1]->getAttribute('style'))->toContain('display: none');
+});
+
+it('refuses an id on a tab', function (): void {
+    Html::render('<x-ui::tabs id="t" label="x" :tabs="[\'a\' => \'A\']"><x-ui::tab name="a" id="own">x</x-ui::tab></x-ui::tabs>');
+})->throws(ViewException::class, 'takes its id from the tabs');

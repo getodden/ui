@@ -8,7 +8,7 @@
     $labelId = $field->id.'-label';
     $listboxId = $field->id.'-listbox';
     $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
-    $inputAttributes = $field->controlAttributes($attributes->whereDoesntStartWith('wire:model'), $required)->except('name')->class(["block w-full rounded-control border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus-visible:outline-primary-400", $borderClasses]);
+    $inputAttributes = $field->controlAttributes($attributes->whereDoesntStartWith(['wire:model', 'wire:key']), $required)->except('name')->class(["block w-full rounded-control border bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus-visible:outline-primary-400", $borderClasses]);
 @endphp
 
 <x-ui::field :id="$field->id" :label="$label" :hint="$hint" :error="$field->error" :required="$required" identified>
@@ -57,17 +57,18 @@
             },
             schedule() {
                 clearTimeout(this.timer)
+                this.sequence++
+                this.results = []
+                this.searched = false
+                this.failed = false
                 if (this.query.trim().length < this.minimum) {
-                    this.sequence++
-                    this.results = []
-                    this.searched = false
-                    this.failed = false
                     this.loading = false
                     this.close()
                     return
                 }
                 this.open = true
                 this.loading = true
+                this.active = -1
                 this.timer = setTimeout(() => this.run(), this.debounce)
             },
             async run() {
@@ -102,6 +103,9 @@
             pick(index) {
                 const item = this.results[index]
                 if (!item) return
+                clearTimeout(this.timer)
+                this.sequence++
+                this.loading = false
                 this.value = item.id
                 this.ownValue = item.id
                 this.query = item.label
@@ -162,7 +166,7 @@
         data-value="{{ $initialValue }}"
         data-label="{{ $valueLabel }}"
         x-on:focusout="if (!$el.contains($event.relatedTarget)) leave()"
-        {{ $attributes->whereStartsWith('wire:model') }}
+        {{ $attributes->whereStartsWith(['wire:model', 'wire:key']) }}
     >
         <input
             type="text"

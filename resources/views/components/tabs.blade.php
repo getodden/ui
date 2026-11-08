@@ -21,7 +21,7 @@
             })
         },
         normalize() {
-            const keys = [...this.$root.querySelectorAll('[role=tab]')].map((tab) => tab.dataset.key)
+            const keys = [...this.$root.querySelectorAll(':scope > [role=tablist] > [role=tab]')].map((tab) => tab.dataset.key)
             if (keys.length === 0) return
             const current = String(this.selected ?? '')
             const next = keys.includes(current) ? current : keys[0]

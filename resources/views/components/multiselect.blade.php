@@ -8,7 +8,7 @@
     $summaryId = $field->id.'-summary';
     $listboxId = $field->id.'-listbox';
     $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
-    $triggerAttributes = $field->controlAttributes($attributes->whereDoesntStartWith('wire:model'), $required)->except(['name', 'required'])->class(["flex w-full items-center justify-between gap-2 rounded-control border bg-white px-3 py-2 text-left text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400", $borderClasses]);
+    $triggerAttributes = $field->controlAttributes($attributes->whereDoesntStartWith(['wire:model', 'wire:key']), $required)->except(['name', 'required'])->class(["flex w-full items-center justify-between gap-2 rounded-control border bg-white px-3 py-2 text-left text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400", $borderClasses]);
     $triggerAttributes = $required ? $triggerAttributes->merge(['aria-required' => 'true']) : $triggerAttributes;
     $triggerAttributes = filled($label) ? $triggerAttributes->merge(['aria-labelledby' => $labelId.' '.$summaryId]) : $triggerAttributes;
 @endphp
@@ -31,6 +31,9 @@
                     new MutationObserver(() => this.revision++).observe(this.$refs.list, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-label', 'data-value'] })
                 })
             },
+            get picked() {
+                return Array.isArray(this.selected) ? this.selected : []
+            },
             get options() {
                 this.revision
                 return [...(this.$refs.list?.querySelectorAll('[role=option]') ?? [])].map((option) => ({ value: option.dataset.value, label: option.dataset.label }))
@@ -39,17 +42,17 @@
                 return this.options.map((option) => option.value)
             },
             has(value) {
-                return this.selected.map(String).includes(value)
+                return this.picked.map(String).includes(value)
             },
             toggle(index) {
                 const value = this.values[index]
                 if (value === undefined) return
-                this.selected = this.has(value) ? this.selected.filter((item) => String(item) !== value) : [...this.selected, value]
+                this.selected = this.has(value) ? this.picked.filter((item) => String(item) !== value) : [...this.picked, value]
             },
             summary() {
-                if (this.selected.length === 0) return this.placeholder
-                if (this.selected.length > 2) return this.countText.replace(':count', this.selected.length)
-                return this.selected.map((value) => this.options.find((option) => option.value === String(value))?.label ?? value).join(', ')
+                if (this.picked.length === 0) return this.placeholder
+                if (this.picked.length > 2) return this.countText.replace(':count', this.picked.length)
+                return this.picked.map((value) => this.options.find((option) => option.value === String(value))?.label ?? value).join(', ')
             },
             show(position) {
                 if (this.values.length === 0) return
@@ -77,7 +80,7 @@
         x-modelable="selected"
         data-initial="{{ json_encode($initial, JSON_THROW_ON_ERROR) }}"
         x-on:click.outside="close()"
-        {{ $attributes->whereStartsWith('wire:model') }}
+        {{ $attributes->whereStartsWith(['wire:model', 'wire:key']) }}
     >
         <button
             type="button"
@@ -98,7 +101,7 @@
             x-on:keydown.tab="close()"
             {{ $triggerAttributes }}
         >
-            <span id="{{ $summaryId }}" class="truncate" x-text="summary()" x-bind:class="selected.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''"></span>
+            <span id="{{ $summaryId }}" class="truncate" x-text="summary()" x-bind:class="picked.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''"></span>
             <x-ui::icon name="fas-chevron-down" size="sm" class="text-gray-500 dark:text-gray-400" />
         </button>
 
@@ -133,7 +136,7 @@
         </ul>
 
         @if (filled($name))
-            <template x-for="item in selected" x-bind:key="item">
+            <template x-for="item in picked" x-bind:key="item">
                 <input type="hidden" name="{{ $name }}[]" x-bind:value="item">
             </template>
         @endif

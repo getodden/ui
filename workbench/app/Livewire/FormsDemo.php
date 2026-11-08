@@ -42,6 +42,15 @@ final class FormsDemo extends Component
 
     public string $owner = '';
 
+    public string $assignee = '';
+
+    public string $assigneeName = '';
+
+    /**
+     * @var list<string>|null
+     */
+    public ?array $unsetTags = null;
+
     public bool $moreTags = false;
 
     public bool $moreTabs = false;
@@ -67,6 +76,7 @@ final class FormsDemo extends Component
             ['id' => 2, 'label' => 'Grace Kelly'],
             ['id' => 3, 'label' => 'Alan Turing'],
             ['id' => 4, 'label' => 'Ada Lovelace'],
+            ['id' => 5, 'label' => 'Slow Sam'],
         ];
 
         if ($query === 'slow') {
@@ -82,6 +92,12 @@ final class FormsDemo extends Component
     public function updatedCustomer(string $value): void
     {
         $this->customerName = collect($this->searchCustomers(''))->firstWhere('id', (int) $value)['label'] ?? '';
+    }
+
+    public function assignAlan(): void
+    {
+        $this->assignee = '3';
+        $this->assigneeName = 'Alan Turing';
     }
 
     public function markAction(string $action): void

@@ -1,13 +1,14 @@
-@props(['heading' => null, 'description' => null, 'level' => 2, 'open' => false])
+@props(['id' => null, 'heading' => null, 'description' => null, 'level' => 2, 'open' => false])
 
 @php
     throw_if(blank($heading), \InvalidArgumentException::class, 'A ui::collapsible needs a heading.');
 
-    $baseId = 'ui-collapsible-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
+    $baseId = filled($id) ? $id : 'ui-collapsible-'.substr(sha1((string) $heading), 0, 10);
     $headingTag = 'h'.min(6, max(1, (int) $level));
 @endphp
 
 <section
+    @if (filled($id)) id="{{ $id }}" @endif
     x-data="{ open: @js((bool) $open) }"
     x-modelable="open"
     {{ $attributes->class(['rounded-surface border border-gray-200 bg-white text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100']) }}
