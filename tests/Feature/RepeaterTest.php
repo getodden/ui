@@ -32,9 +32,7 @@ it('gives every row a unique key', function (): void {
         ->and(array_search('', $keys, true))->toBeFalse();
 });
 
-it('refuses rows that are not arrays when keying and drops them from browser input', function (): void {
-    expect(RepeaterRows::onlyRows(['junk', ['name' => 'a'], 3]))->toBe([['name' => 'a']]);
-
+it('refuses rows that are not arrays when keying', function (): void {
     RepeaterRows::withKeys(['a@x.com', 'b@x.com']);
 })->throws(InvalidArgumentException::class);
 
@@ -374,6 +372,15 @@ it('keeps rows loaded over the maximum when a field inside a row is edited', fun
 
     expect($component->get('items'))->toHaveCount(6)
         ->and(repeaterNames($component->get('items'))[0])->toBe('Edited');
+});
+
+it('keeps rows loaded over the maximum when several fields are edited in one request', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)
+        ->call('loadOverMaximum')
+        ->update(updates: ['items.0.name' => 'A', 'items.1.name' => 'B']);
+
+    expect($component->get('items'))->toHaveCount(6)
+        ->and(array_slice(repeaterNames($component->get('items')), 0, 2))->toBe(['A', 'B']);
 });
 
 it('refuses a spec whose limits contradict each other', function (int $min, ?int $max): void {

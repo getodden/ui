@@ -16,15 +16,6 @@ final class RepeaterRows
      * @param  array<mixed>  $rows
      * @return list<array<string, mixed>>
      */
-    public static function onlyRows(array $rows): array
-    {
-        return array_values(array_filter($rows, is_array(...)));
-    }
-
-    /**
-     * @param  array<mixed>  $rows
-     * @return list<array<string, mixed>>
-     */
     public static function withoutKeys(array $rows): array
     {
         return array_map(function (mixed $row): array {

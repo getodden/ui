@@ -71,7 +71,7 @@ trait WithRepeater
         $property = Str::before($path, '.');
 
         if ($this->repeaterSpec($property) !== null) {
-            $this->repeaterCountsBeforeUpdate[$property] = count($this->{$property});
+            $this->repeaterCountsBeforeUpdate[$property] ??= count($this->{$property});
         }
     }
 
@@ -85,7 +85,6 @@ trait WithRepeater
         }
 
         $countBefore = $this->repeaterCountsBeforeUpdate[$property] ?? null;
-        unset($this->repeaterCountsBeforeUpdate[$property]);
 
         $submitted = array_values($this->{$property});
         $before = RepeaterRows::withKeys(array_map(fn (mixed $row): array => is_array($row) ? $row : [], $submitted));
