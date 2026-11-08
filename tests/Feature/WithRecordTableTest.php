@@ -287,6 +287,10 @@ it('exposes the sort state for the table header', function (): void {
         'sortable' => ['name', 'price', 'colourPlain', 'colour'],
         'sort' => 'price',
         'direction' => 'desc',
+        'tabs' => [],
+        'tab' => null,
+        'selectedCount' => 0,
+        'bulkActions' => [],
     ]);
 });
 

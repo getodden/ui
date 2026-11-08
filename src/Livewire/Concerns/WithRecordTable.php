@@ -31,6 +31,11 @@ trait WithRecordTable
     #[Url(except: 10)]
     public mixed $perPage = 10;
 
+    #[Url(except: '')]
+    public mixed $tab = '';
+
+    public mixed $selected = [];
+
     /**
      * @return array<string, string|Closure(EloquentBuilder<*>|QueryBuilder, string): void>
      */
@@ -60,6 +65,34 @@ trait WithRecordTable
     protected function recordFilters(): array
     {
         return [];
+    }
+
+    /**
+     * @return array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>
+     */
+    protected function recordTabs(): array
+    {
+        return [];
+    }
+
+    protected function defaultTab(): ?string
+    {
+        $first = array_key_first($this->recordTabs());
+
+        return $first === null ? null : (string) $first;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function bulkActions(): array
+    {
+        return [];
+    }
+
+    protected function maximumSelection(): int
+    {
+        return 100;
     }
 
     /**
@@ -115,13 +148,96 @@ trait WithRecordTable
         $this->resetPage();
     }
 
+    public function setTab(string $key): void
+    {
+        $tabs = $this->recordTabs();
+
+        if (! array_key_exists($key, $tabs)) {
+            return;
+        }
+
+        $this->tab = $key === $this->defaultTab() ? '' : $key;
+        $this->resetPage();
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+    }
+
+    public function runBulkAction(string $action): void
+    {
+        if (! array_key_exists($action, $this->bulkActions()) || ! method_exists($this, $action)) {
+            return;
+        }
+
+        $keys = $this->selectedKeys();
+
+        if ($keys === []) {
+            return;
+        }
+
+        $this->{$action}($keys);
+        $this->clearSelection();
+    }
+
     protected function recordTableState(): RecordTableState
     {
         return new RecordTableState(
             array_map(strval(...), array_keys($this->sortableColumns())),
             $this->activeSort(),
             $this->activeDirection(),
+            array_map(fn (array $tab): string => $tab['label'], $this->recordTabs()),
+            $this->activeTab(),
+            count($this->selectedKeys()),
+            $this->bulkActions(),
         );
+    }
+
+    protected function activeTab(): ?string
+    {
+        $tabs = $this->recordTabs();
+
+        if ($tabs === []) {
+            return null;
+        }
+
+        $requested = $this->scalarState($this->tab);
+
+        if ($requested !== '' && array_key_exists($requested, $tabs)) {
+            return $requested;
+        }
+
+        $default = $this->defaultTab();
+
+        return $default !== null && array_key_exists($default, $tabs) ? $default : (string) array_key_first($tabs);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function selectedKeys(): array
+    {
+        if (! is_array($this->selected)) {
+            return [];
+        }
+
+        $keys = [];
+        $limit = max(0, $this->maximumSelection());
+
+        foreach ($this->selected as $value) {
+            if (count($keys) >= $limit) {
+                break;
+            }
+
+            $key = $this->scalarState($value);
+
+            if ($key !== '' && mb_strlen($key) <= 255) {
+                $keys[$key] = true;
+            }
+        }
+
+        return array_map(strval(...), array_keys($keys));
     }
 
     protected function activeSort(): ?string
@@ -218,6 +334,12 @@ trait WithRecordTable
             $filters[$key]($query, $value);
         }
 
+        $tab = $this->activeTab();
+
+        if ($tab !== null) {
+            $this->recordTabs()[$tab]['scope']($query);
+        }
+
         if ($sort !== null) {
             $this->orderUsing($query, $this->sortableColumns()[$sort], $this->activeDirection());
         }
@@ -310,11 +432,19 @@ trait WithRecordTable
         $this->direction = $this->scrubbedState($this->direction);
         $this->filters = $this->scrubbedState($this->filters);
         $this->perPage = $this->scrubbedState($this->perPage);
+        $this->tab = $this->scrubbedState($this->tab);
+        $this->selected = $this->selectedKeys();
+    }
+
+    public function updatedPaginators(): void
+    {
+        $this->clearSelection();
     }
 
     public function updatedWithRecordTable(string $name): void
     {
-        if (in_array(explode('.', $name)[0], ['search', 'sort', 'direction', 'filters', 'perPage'], true)) {
+        if (in_array(explode('.', $name)[0], ['search', 'sort', 'direction', 'filters', 'perPage', 'tab'], true)) {
+            $this->clearSelection();
             $this->resetPage();
         }
     }

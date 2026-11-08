@@ -28,6 +28,11 @@ final class Html
         return $document;
     }
 
+    public static function parse(string $html): HTMLDocument
+    {
+        return HTMLDocument::createFromString('<body>'.$html.'</body>', LIBXML_NOERROR);
+    }
+
     /**
      * @param  array<string, string>  $messages
      */
