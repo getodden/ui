@@ -15,7 +15,7 @@ class BoardComponent extends Component
     use WithBoard;
 
     /**
-     * @var list<array{card: string, column: string, position: int}>
+     * @var list<array{card: string, column: string, position: int, after: ?string}>
      */
     public array $moves = [];
 
@@ -33,9 +33,9 @@ class BoardComponent extends Component
         return $this->pageSize;
     }
 
-    protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool
     {
-        $this->moves[] = ['card' => $cardId, 'column' => $toColumn, 'position' => $position];
+        $this->moves[] = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId];
 
         if ($this->outcome === 'forbid') {
             throw new AuthorizationException;

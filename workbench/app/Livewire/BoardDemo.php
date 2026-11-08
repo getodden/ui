@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Workbench\App\Livewire;
 
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Odden\Ui\Livewire\Concerns\WithBoard;
 use Workbench\App\Models\Fruit;
@@ -12,6 +13,17 @@ use Workbench\App\Models\Fruit;
 final class BoardDemo extends Component
 {
     use WithBoard;
+
+    #[Url]
+    public bool $manual = false;
+
+    #[Url]
+    public bool $viewer = false;
+
+    /**
+     * @var array<string, mixed>
+     */
+    public array $lastMove = [];
 
     private const array COLUMNS = ['red' => 'Red', 'green' => 'Green', 'yellow' => 'Yellow', 'purple' => 'Purple (locked)'];
 
@@ -25,8 +37,10 @@ final class BoardDemo extends Component
         return 3;
     }
 
-    protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool
     {
+        $this->lastMove = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId];
+
         if ($toColumn === 'purple') {
             return false;
         }

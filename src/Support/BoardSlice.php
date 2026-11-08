@@ -6,10 +6,15 @@ namespace Odden\Ui\Support;
 
 use Illuminate\Support\Collection;
 
+/**
+ * @template TRecord
+ */
 final readonly class BoardSlice
 {
+    public const int END_POSITION = 100000;
+
     /**
-     * @param  Collection<int, mixed>  $records
+     * @param  Collection<int, TRecord>  $records
      */
     public function __construct(
         public Collection $records,

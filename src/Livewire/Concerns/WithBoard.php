@@ -6,14 +6,15 @@ namespace Odden\Ui\Livewire\Concerns;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Odden\Ui\Support\BoardSlice;
+use stdClass;
 
 trait WithBoard
 {
-    private const int MAXIMUM_POSITION = 100000;
-
     private const int MAXIMUM_LIMIT = 1000;
 
     /**
@@ -27,26 +28,28 @@ trait WithBoard
      */
     abstract protected function boardColumnKeys(): array;
 
-    abstract protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool;
+    abstract protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool;
 
     protected function boardPageSize(): int
     {
         return 20;
     }
 
-    public function moveCard(mixed $card, mixed $column, mixed $position): bool
+    public function moveCard(mixed $card, mixed $column, mixed $position, mixed $after = null): bool
     {
         $cardId = $this->boardCardId($card);
         $toColumn = $this->boardColumnKey($column);
 
         $toPosition = $this->boardPosition($position);
 
-        if ($cardId === null || $toColumn === null || $toPosition === null) {
+        $afterId = $after === null ? null : $this->boardCardId($after);
+
+        if ($cardId === null || $toColumn === null || $toPosition === null || ($after !== null && $afterId === null)) {
             return false;
         }
 
         try {
-            return $this->moveBoardCard($cardId, $toColumn, $toPosition);
+            return $this->moveBoardCard($cardId, $toColumn, $toPosition, $afterId);
         } catch (AuthorizationException) {
             return false;
         }
@@ -69,13 +72,30 @@ trait WithBoard
     }
 
     /**
-     * @param  EloquentBuilder<*>|QueryBuilder  $query
+     * @template TRecord of Model
+     *
+     * @param  EloquentBuilder<TRecord>|QueryBuilder  $query
+     * @return ($query is EloquentBuilder<TRecord> ? BoardSlice<TRecord> : BoardSlice<stdClass>)
      */
     protected function boardSlice(EloquentBuilder|QueryBuilder $query, string $column): BoardSlice
     {
         $limit = $this->boardLimit($column);
-        $records = (clone $query)->limit($limit + 1)->get();
 
+        if ($query instanceof QueryBuilder) {
+            return $this->sliceOf((clone $query)->limit($limit + 1)->get(), $limit);
+        }
+
+        return $this->sliceOf((clone $query)->limit($limit + 1)->get(), $limit);
+    }
+
+    /**
+     * @template TValue
+     *
+     * @param  Collection<int, TValue>  $records
+     * @return BoardSlice<TValue>
+     */
+    private function sliceOf(Collection $records, int $limit): BoardSlice
+    {
         return new BoardSlice($records->take($limit)->values(), $records->count() > $limit);
     }
 
@@ -96,7 +116,7 @@ trait WithBoard
             $position = (int) $position;
         }
 
-        return is_int($position) ? min(max($position, 0), self::MAXIMUM_POSITION) : null;
+        return is_int($position) ? min(max($position, 0), BoardSlice::END_POSITION) : null;
     }
 
     private function boardColumnKey(mixed $column): ?string

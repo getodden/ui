@@ -15,8 +15,8 @@ it('hands the card, column and position to the host write method', function (): 
     $component = Livewire::test(BoardComponent::class)->call('moveCard', 3, 'green', 1)->assertReturned(true)->call('moveCard', '4', 'red', '0')->assertReturned(true);
 
     expect($component->get('moves'))->toBe([
-        ['card' => '3', 'column' => 'green', 'position' => 1],
-        ['card' => '4', 'column' => 'red', 'position' => 0],
+        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => null],
+        ['card' => '4', 'column' => 'red', 'position' => 0, 'after' => null],
     ]);
 });
 
@@ -45,6 +45,21 @@ it('never calls the host for a card id or position it cannot trust', function (m
     'array position' => ['1', [0]],
     'huge digit position' => ['1', str_repeat('9', 40)],
 ]);
+
+it('hands the neighbour the card now sits below to the host', function (): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', '3', 'green', 1, '7')->assertReturned(true)->call('moveCard', '3', 'green', 0, 7)->assertReturned(true);
+
+    expect($component->get('moves'))->toBe([
+        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => '7'],
+        ['card' => '3', 'column' => 'green', 'position' => 0, 'after' => '7'],
+    ]);
+});
+
+it('never calls the host for a neighbour id it cannot trust', function (mixed $after): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', '1', 'red', 0, $after)->assertReturned(false);
+
+    expect($component->get('moves'))->toBe([]);
+})->with([[['7']], [''], [str_repeat('9', 101)], ["\xB1\x31"], [1.5]]);
 
 it('clamps a negative or absurd position before it reaches the host', function (int $position, int $expected): void {
     $component = Livewire::test(BoardComponent::class)->call('moveCard', '1', 'red', $position);
