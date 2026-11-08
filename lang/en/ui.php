@@ -53,4 +53,18 @@ return [
         'refused' => ':card could not be moved and is back in :column',
         'failed' => ':card could not be moved because the request failed and is back in :column',
     ],
+    'chart' => [
+        'empty' => 'No data to show',
+        'value' => 'Value',
+        'series' => 'Series :number',
+        'category' => 'Category',
+        'share' => 'Share',
+        'total' => 'Total',
+        'show_table' => 'Show data table',
+        'hide_table' => 'Hide data table',
+        'trend' => ':label, trend',
+        'up' => 'Up',
+        'down' => 'Down',
+        'flat' => 'No change',
+    ],
 ];
