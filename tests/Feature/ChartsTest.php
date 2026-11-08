@@ -472,3 +472,83 @@ it('names each data table toggle after its chart', function (): void {
 
     expect($button->textContent)->toContain('Show data table', 'Deals by month');
 });
+
+it('ignores numbers too large to chart without failing the render', function (): void {
+    expect(ChartData::number(1.7e308))->toBeNull()
+        ->and(ChartData::number('1e308'))->toBeNull()
+        ->and(ChartData::number(1e15))->toBe(1e15);
+
+    $dom = Html::render('<x-ui::bar-chart label="L" :categories="[\'a\']" :series="$series" stacked /><x-ui::sparkline label="S" :values="[1.7e308, -1.7e308]" /><x-ui::line-chart label="N" :categories="[\'a\', \'b\']" :series="[[\'values\' => [\'1e308\', \'-1e308\']]]" />', [
+        'series' => [chartSeries('A', [1e308]), chartSeries('B', [1e308])],
+    ]);
+
+    expect($dom->querySelectorAll('figure'))->toHaveCount(3);
+});
+
+it('keeps the same chart id across renders so Livewire can morph the chart', function (string $template): void {
+    $ids = array_map(fn (): string => Html::render($template)->querySelector('figure')->getAttribute('id'), [1, 2]);
+
+    expect($ids[0])->toBe($ids[1])->and($ids[0])->toStartWith('ui-chart-');
+})->with([
+    'bar' => ['<x-ui::bar-chart label="L" :categories="[\'a\']" :series="[[\'values\' => [1]]]" />'],
+    'line' => ['<x-ui::line-chart label="L" :categories="[\'a\']" :series="[[\'values\' => [1]]]" />'],
+    'donut' => ['<x-ui::donut-chart label="L" :segments="[[\'label\' => \'A\', \'value\' => 1]]" />'],
+    'sparkline' => ['<x-ui::sparkline label="L" :values="[1, 2]" />'],
+]);
+
+it('gives line chart axis ticks distinct labels when the range is narrow', function (): void {
+    $lines = ChartGeometry::lines(['a', 'b', 'c'], [chartSeries('Revenue', [1201000.0, 1203500.0, 1204000.0])]);
+    $labels = array_column($lines['ticks'], 'label');
+
+    expect(count(array_unique($labels)))->toBe(count($labels));
+});
+
+it('promotes a rounded compact value to the next unit', function (): void {
+    expect(ChartScale::compact(999950.0))->toBe('1M')
+        ->and(ChartScale::compact(999949.0))->toBe('999.9K');
+});
+
+it('folds donut segments beyond the palette into Other and totals them all', function (): void {
+    $segments = array_map(fn (int $number): array => ['label' => 's'.$number, 'value' => 100], range(1, 8));
+
+    $dom = Html::render('<x-ui::donut-chart label="L" :segments="$segments" />', ['segments' => $segments]);
+    $items = array_map(fn ($item): string => $item->textContent, iterator_to_array($dom->querySelectorAll('ul li')));
+
+    expect($items)->toHaveCount(ChartData::MAXIMUM_SERIES)
+        ->and(trim(end($items)))->toBe('Other: 300 (37.5%)')
+        ->and($dom->querySelector('svg text')->textContent)->toBe('800');
+});
+
+it('shows a large donut total in compact form', function (): void {
+    $dom = Html::render('<x-ui::donut-chart label="L" :segments="[[\'label\' => \'A\', \'value\' => 1234567.89]]" />');
+
+    expect($dom->querySelector('svg text')->textContent)->toBe('1.2M');
+});
+
+it('keeps a tiny donut segment after a dominant one instead of drawing a full ring', function (): void {
+    $donut = ChartGeometry::donut([['label' => 'big', 'value' => 999999.0], ['label' => 'tiny', 'value' => 1.0]]);
+
+    expect(substr_count($donut['segments'][0]['path'], 'a'))->toBe(0)
+        ->and($donut['segments'][0]['path'])->toContain('A');
+});
+
+it('reads the direction of a numeric stat delta from its sign', function (float|int|string $delta, string $word): void {
+    $deltaText = Html::render('<x-ui::stat label="Revenue" value="$9k" :delta="$delta" />', ['delta' => $delta])->querySelectorAll('dd')[1];
+
+    expect($deltaText->querySelector('.sr-only')->textContent)->toBe($word);
+})->with([
+    'positive float' => [12.5, 'Up'],
+    'negative int' => [-3, 'Down'],
+    'positive numeric string' => ['4.5', 'Up'],
+]);
+
+it('says in text whether a stat change is favourable', function (string $attributes, ?string $word): void {
+    $deltaText = Html::render('<x-ui::stat label="Churn" value="2%" delta="-0.4%" '.$attributes.' />')->querySelectorAll('dd')[1];
+    $spoken = array_map(fn ($node): string => $node->textContent, iterator_to_array($deltaText->querySelectorAll('.sr-only')));
+
+    expect($word === null ? count($spoken) : $spoken)->toBe($word === null ? 1 : ['Down', $word]);
+})->with([
+    'good' => ['sentiment="positive"', 'Favourable'],
+    'bad' => ['sentiment="negative"', 'Unfavourable'],
+    'neutral' => ['sentiment="neutral"', null],
+]);

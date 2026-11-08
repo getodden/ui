@@ -9,6 +9,8 @@
 
     $hasDelta = filled($delta);
     $direction = in_array($direction, ['up', 'down', 'flat'], true) ? $direction : match (true) {
+        is_numeric($delta) && (float) $delta > 0 => 'up',
+        is_numeric($delta) && (float) $delta < 0 => 'down',
         str_starts_with(trim((string) $delta), '+') => 'up',
         str_starts_with(trim((string) $delta), '-'), str_starts_with(trim((string) $delta), '−') => 'down',
         default => 'flat',
@@ -41,6 +43,9 @@
                     <x-ui::icon :name="$deltaIcon" size="sm" />
                     <span class="sr-only">{{ __('ui::ui.chart.'.$direction) }}</span>
                     <span class="tabular-nums">{{ $delta }}</span>
+                    @if ($sentiment !== 'neutral')
+                        <span class="sr-only">{{ __('ui::ui.chart.'.($sentiment === 'positive' ? 'favourable' : 'unfavourable')) }}</span>
+                    @endif
                 </span>
                 @if (filled($deltaLabel))
                     <span class="text-gray-600 dark:text-gray-400">{{ $deltaLabel }}</span>

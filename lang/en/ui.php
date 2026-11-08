@@ -58,6 +58,7 @@ return [
         'value' => 'Value',
         'series' => 'Series :number',
         'segment' => 'Segment :number',
+        'other' => 'Other',
         'category' => 'Category',
         'share' => 'Share',
         'total' => 'Total',
@@ -67,5 +68,7 @@ return [
         'up' => 'Up',
         'down' => 'Down',
         'flat' => 'No change',
+        'favourable' => 'Favourable',
+        'unfavourable' => 'Unfavourable',
     ],
 ];

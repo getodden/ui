@@ -11,17 +11,19 @@
         ->filter(fn (mixed $segment): bool => is_array($segment))
         ->map(fn (array $segment): array => ['label' => trim(\Odden\Ui\Support\ChartData::text($segment['label'] ?? '')), 'value' => \Odden\Ui\Support\ChartData::number($segment['value'] ?? null) ?? 0.0])
         ->filter(fn (array $segment): bool => $segment['value'] > 0)
-        ->take(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES)
-        ->values()
+        ->values();
+    $overflow = $segments->count() > \Odden\Ui\Support\ChartData::MAXIMUM_SERIES ? $segments->slice(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES - 1) : collect();
+    $segments = $segments->take(\Odden\Ui\Support\ChartData::MAXIMUM_SERIES - ($overflow->isEmpty() ? 0 : 1))
+        ->when($overflow->isNotEmpty(), fn ($kept) => $kept->push(['label' => __('ui::ui.chart.other'), 'value' => (float) $overflow->sum('value')]))
         ->map(fn (array $segment, int $index): array => ['label' => $segment['label'] !== '' ? $segment['label'] : __('ui::ui.chart.segment', ['number' => $index + 1]), 'value' => $segment['value']])
         ->all();
     $hasData = $segments !== [];
-    $chartId = $attributes->get('id') ?? 'ui-chart-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
+    $chartId = $attributes->get('id') ?? \Odden\Ui\Support\ChartData::identifier('donut', (string) $label);
     $captionId = $chartId.'-caption';
 
     if ($hasData) {
         $geometry = \Odden\Ui\Support\ChartGeometry::donut($segments);
-        $totalText = \Odden\Ui\Support\ChartScale::format($geometry['total']);
+        $totalText = \Odden\Ui\Support\ChartScale::compact($geometry['total']);
         $legend = collect($geometry['segments'])->map(fn (array $segment): array => ['text' => $segment['label'].': '.\Odden\Ui\Support\ChartScale::format($segment['value']).' ('.$segment['share'].')', 'paint' => \Odden\Ui\Support\ChartPalette::paint($segment['series'])])->all();
         $rows = collect($geometry['segments'])->map(fn (array $segment): array => [$segment['label'], \Odden\Ui\Support\ChartScale::format($segment['value']), $segment['share']])->all();
     }

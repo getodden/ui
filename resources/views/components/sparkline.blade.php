@@ -9,7 +9,7 @@
 
     $values = is_array($values) ? array_map(\Odden\Ui\Support\ChartData::number(...), array_slice(array_values($values), 0, \Odden\Ui\Support\ChartData::MAXIMUM_CATEGORIES)) : [];
     $hasData = array_filter($values, fn (?float $value): bool => $value !== null) !== [];
-    $chartId = $attributes->get('id') ?? 'ui-chart-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
+    $chartId = $attributes->get('id') ?? \Odden\Ui\Support\ChartData::identifier('sparkline', (string) $label);
     $captionId = $chartId.'-caption';
 
     if ($hasData) {

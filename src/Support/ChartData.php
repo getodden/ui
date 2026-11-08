@@ -10,6 +10,8 @@ final class ChartData
 
     public const int MAXIMUM_SERIES = ChartPalette::SIZE;
 
+    public const float MAXIMUM_MAGNITUDE = 1e15;
+
     public static function number(mixed $value): ?float
     {
         $number = match (true) {
@@ -18,7 +20,12 @@ final class ChartData
             default => null,
         };
 
-        return $number !== null && is_finite($number) ? $number : null;
+        return $number !== null && is_finite($number) && abs($number) <= self::MAXIMUM_MAGNITUDE ? $number : null;
+    }
+
+    public static function identifier(string $kind, string $label): string
+    {
+        return 'ui-chart-'.substr(hash('xxh3', $kind.'|'.$label), 0, 8);
     }
 
     public static function text(mixed $value): string

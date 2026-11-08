@@ -105,7 +105,7 @@ final class ChartGeometry
             'horizontal' => $horizontal,
             'baseline' => $valueAxis(0.0),
             'plot' => $plot,
-            'ticks' => array_map(fn (float $tick): array => ['position' => $valueAxis($tick), 'label' => ChartScale::compact($tick)], $ticks),
+            'ticks' => array_map(fn (float $tick, string $label): array => ['position' => $valueAxis($tick), 'label' => $label], $ticks, ChartScale::compactAll($ticks)),
             'labels' => $labels,
             'bars' => $bars,
         ];
@@ -193,7 +193,7 @@ final class ChartGeometry
             'width' => self::WIDTH,
             'height' => self::VERTICAL_HEIGHT,
             'plot' => $plot,
-            'ticks' => array_map(fn (float $tick): array => ['position' => $verticalAt($tick), 'label' => ChartScale::compact($tick)], $ticks),
+            'ticks' => array_map(fn (float $tick, string $label): array => ['position' => $verticalAt($tick), 'label' => $label], $ticks, ChartScale::compactAll($ticks)),
             'labels' => $labels,
             'lines' => $lines,
         ];
@@ -262,12 +262,12 @@ final class ChartGeometry
 
         foreach ($segments as $index => $segment) {
             $sweep = $segment['value'] / $total * 360;
-            $whole = $sweep >= 359.99;
+            $whole = count($segments) === 1;
             $end = $start + $sweep;
 
             $path = $whole
                 ? self::circle($centre, $outer).' '.self::circle($centre, $inner)
-                : self::arc($centre, $outer, $inner, $start, $end);
+                : self::arc($centre, $outer, $inner, $start, min($end, $start + 359.9));
 
             $shapes[] = [
                 'path' => $path,

@@ -182,7 +182,7 @@ Charts are server-rendered SVG with no JavaScript library. Data is plain arrays:
 
 The label is the accessible name (a `figcaption` the SVG is labelled by) and is hidden unless you pass `label-visible`. Every chart also holds its values in a data table that screen readers can reach, and the bar, line and donut charts add a "Show data table" button that reveals it (it needs Alpine, which Livewire bundles). With no data the chart shows "No data to show" instead of an empty plot. A line with one point draws a marker. Charts take at most 366 categories and 6 series (one per palette colour).
 
-Series and segments take their colours in order from `--ui-chart-1` to `--ui-chart-6`, which `theme.css` defines for light and dark; override them to rebrand. Colour is never the only carrier: every mark has a tooltip and a row in the table, and the legend names each series. A stat's `direction` is inferred from a leading `+` or `-` in `delta` when you do not pass it, and its colour follows `sentiment` (up is positive, down negative, unless you say otherwise, for example for churn).
+Series and segments take their colours in order from `--ui-chart-1` to `--ui-chart-6`, which `theme.css` defines for light and dark; override them to rebrand. Colour is never the only carrier: every mark has a tooltip and a row in the table, and the legend names each series. A stat's `direction` is inferred from a leading `+` or `-` in `delta`, or from the sign of a numeric one, when you do not pass it, and its colour follows `sentiment` (up is positive, down negative, unless you say otherwise, for example for churn). A donut with more than six segments folds the tail into "Other", and values beyond 1e15 in magnitude are ignored.
 
 ## Livewire traits
 

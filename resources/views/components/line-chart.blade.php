@@ -10,7 +10,7 @@
     $categories = \Odden\Ui\Support\ChartData::categories($categories);
     $series = \Odden\Ui\Support\ChartData::series($series, count($categories));
     $hasData = \Odden\Ui\Support\ChartData::hasValues($series);
-    $chartId = $attributes->get('id') ?? 'ui-chart-'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(8));
+    $chartId = $attributes->get('id') ?? \Odden\Ui\Support\ChartData::identifier('line', (string) $label);
     $captionId = $chartId.'-caption';
 
     if ($hasData) {
