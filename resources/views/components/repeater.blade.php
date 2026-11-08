@@ -1,0 +1,149 @@
+@props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'rows' => [], 'min' => 0, 'max' => null, 'itemLabel' => null, 'addLabel' => null])
+
+@php
+    throw_if(blank($name), \InvalidArgumentException::class, 'A ui::repeater needs the name of the array property it edits.');
+
+    $field = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null);
+    $rows = array_values($rows);
+    $itemLabel = filled($itemLabel) ? $itemLabel : __('ui::ui.repeater.item');
+    $atMaximum = $max !== null && count($rows) >= (int) $max;
+
+    $config = [
+        'name' => $name,
+        'itemLabel' => $itemLabel,
+        'messages' => [
+            'added' => __('ui::ui.repeater.added', ['row' => ':row']),
+            'removed' => __('ui::ui.repeater.removed', ['row' => ':row']),
+            'moved' => __('ui::ui.repeater.moved', ['row' => ':row', 'position' => ':position', 'total' => ':total']),
+        ],
+    ];
+
+    $script = <<<'JS'
+(config) => ({
+    status: '',
+    dragging: null,
+    root: null,
+    init() {
+        this.root = this.$el
+    },
+    rowElements() {
+        return [...this.root.querySelectorAll('[data-repeater-key]')]
+    },
+    rowElement(key) {
+        return this.rowElements().find((row) => row.dataset.repeaterKey === key)
+    },
+    titleOf(row) {
+        return row.querySelector('[data-repeater-title]').textContent.trim()
+    },
+    announce(template, row) {
+        const rows = this.rowElements()
+
+        this.status = template
+            .replace(':row', this.titleOf(row))
+            .replace(':position', rows.indexOf(row) + 1)
+            .replace(':total', rows.length)
+    },
+    async settle(call) {
+        await call
+        await this.$nextTick()
+    },
+    async add() {
+        await this.settle(this.$wire.addRepeaterRow(config.name))
+
+        const row = this.rowElements().at(-1)
+
+        if (row) {
+            this.announce(config.messages.added, row)
+            row.querySelector('input:not([type=hidden]), select, textarea, [contenteditable=true]')?.focus()
+        }
+    },
+    async remove(key, position) {
+        const title = this.titleOf(this.rowElement(key))
+
+        await this.settle(this.$wire.removeRepeaterRow(config.name, key))
+
+        this.status = config.messages.removed.replace(':row', title)
+
+        const rows = this.rowElements()
+        const next = rows[Math.min(position, rows.length - 1)]
+
+        if (next) {
+            next.querySelector('[data-repeater-row]').focus()
+        } else {
+            this.root.querySelector('[data-repeater-add]').focus()
+        }
+    },
+    async move(key, direction) {
+        await this.settle(this.$wire.moveRepeaterRow(config.name, key, direction))
+
+        const row = this.rowElement(key)
+
+        this.announce(config.messages.moved, row)
+
+        const preferred = row.querySelector('[data-repeater-action=' + direction + ']:not([disabled])')
+        const fallback = row.querySelector('[data-repeater-action]:not([disabled])')
+
+        ;(preferred ?? fallback)?.focus()
+    },
+    startDrag(event, key) {
+        this.dragging = key
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', key)
+        event.dataTransfer.setDragImage(this.rowElement(key), 0, 0)
+    },
+    allowDrop(event) {
+        if (this.dragging !== null) {
+            event.preventDefault()
+        }
+    },
+    async drop(targetKey) {
+        const dragged = this.dragging
+
+        this.dragging = null
+
+        const keys = this.rowElements().map((row) => row.dataset.repeaterKey)
+        const from = keys.indexOf(dragged)
+        const to = keys.indexOf(targetKey)
+
+        if (from < 0 || to < 0 || from === to) {
+            return
+        }
+
+        keys.splice(to, 0, keys.splice(from, 1)[0])
+
+        await this.settle(this.$wire.reorderRepeaterRows(config.name, keys))
+
+        this.announce(config.messages.moved, this.rowElement(dragged))
+    },
+})
+JS;
+@endphp
+
+<div {{ $attributes->except('aria-describedby')->merge(array_filter([
+    'role' => 'group',
+    'aria-labelledby' => $field->id.'-label',
+    'aria-describedby' => $field->describedBy,
+    'x-data' => '('.$script.')('.\Illuminate\Support\Js::from($config).')',
+], fn ($value) => $value !== null))->class('space-y-3') }}>
+    <p id="{{ $field->id }}-label" class="block text-sm font-medium text-gray-900 dark:text-gray-100">{{ $label }}</p>
+
+    @if (filled($hint))
+        <p id="{{ $field->id }}-hint" class="text-sm text-gray-500 dark:text-gray-400">{{ $hint }}</p>
+    @endif
+
+    @if ($rows === [])
+        <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('ui::ui.repeater.empty') }}</p>
+    @else
+        <ol class="space-y-3">
+            {{ $slot }}
+        </ol>
+    @endif
+
+    @if ($field->error !== null)
+        <p id="{{ $field->id }}-error" class="text-sm text-rose-700 dark:text-rose-400">{{ $field->error }}</p>
+    @endif
+
+    <x-ui::button variant="outline" size="sm" icon="fas-plus" :disabled="$atMaximum" data-repeater-add x-on:click="add()">{{ filled($addLabel) ? $addLabel : __('ui::ui.repeater.add') }}</x-ui::button>
+
+    <p class="sr-only" role="status" aria-live="polite" x-text="status"></p>
+</div>
