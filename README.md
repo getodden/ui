@@ -42,6 +42,9 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::toggle>` | the field props; renders a switch |
 | `<x-ui::icon>` | `name` (for example `fas-check`), `size` sm, md, lg |
 | `<x-ui::editor>` | the field props, `format` html or json, `toolbar` (list of tools, `[]` for none), `mentions`, `mention-search`, `mention-char` |
+| `<x-ui::board>` | `label` (required unless you pass `aria-label` or `aria-labelledby`), `columns` (key => label, offered in each card's Move to select) |
+| `<x-ui::board.column>` | `column` (key), `label`, `count`, `total` (text, optional), `has-more` |
+| `<x-ui::board.card>` | `id`, `label` |
 | `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
@@ -90,6 +93,50 @@ Tools are `bold`, `italic`, `link`, `bullet-list`, `ordered-list`, `heading-2` a
 Mentions come from a static `:mentions="[['id' => '7', 'label' => 'Ada']]"` list, which is read once and is visible in the page source, or from `mention-search`, a method on your component that takes the query and returns that same shape. Anyone can call that method with any string, so check who may see the results, cap the query and the number of results, return only `id` and `label`, and mark it `#[Renderless]`.
 
 The bound value is whatever the browser sends, so treat it as untrusted. Before you save it or print it with `{!! !!}`, pass HTML through `Odden\Ui\Support\RichHtml::clean()` and a `format="json"` document through `RichJson::clean()`. Both keep only what the editor can produce. Both throw a `LengthException` above their size limits (`RichHtml::MAXIMUM_BYTES`, `MAXIMUM_TAGS`, `MAXIMUM_TAG_BYTES`, `RichJson::MAXIMUM_NODES`, `MAXIMUM_DEPTH`), so validate the length first. A single tag over 8 KiB, such as a very long link or a large pasted comment, counts as too long.
+
+### Board
+
+```blade
+<x-ui::board label="Deals" :columns="$labels">
+    @foreach ($columns as $key => $column)
+        <x-ui::board.column :column="$key" :label="$column['label']" :count="$column['count']" :total="$column['total']" :has-more="$column['slice']->hasMore">
+            @foreach ($column['slice']->records as $deal)
+                <x-ui::board.card wire:key="deal-{{ $deal->id }}" :id="$deal->id" :label="$deal->name">{{ $deal->name }}</x-ui::board.card>
+            @endforeach
+        </x-ui::board.column>
+    @endforeach
+</x-ui::board>
+```
+
+```php
+use Odden\Ui\Livewire\Concerns\WithBoard;
+
+class Deals extends Component
+{
+    use WithBoard;
+
+    protected function boardColumnKeys(): array
+    {
+        return ['new', 'won'];
+    }
+
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
+    {
+        return Deal::query()->whereKey($cardId)->update(['stage' => $toColumn]) > 0;
+    }
+
+    protected function boardPageSize(): int
+    {
+        return 20;
+    }
+}
+```
+
+A card moves by dragging it, or with the Move to select on the card, which works with the keyboard and on touch screens. The page moves the card at once and calls `moveBoardCard()`. Return `false`, or throw an `AuthorizationException`, to refuse the move: the card goes back and the status region says so. A request that fails does the same.
+
+The card id arrives from the browser as a string and is not trusted: look the card up through your tenant or policy scope. The column is checked against `boardColumnKeys()` and the position is a non-negative integer, counted among the cards currently shown in that column (the select appends to the end). The write method is never called for anything that fails those checks.
+
+`boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, which raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
 
 ### Table
 
@@ -182,6 +229,7 @@ class Contacts extends Component
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
 - The editor's toolbar is one tab stop with arrow-key movement and `aria-pressed` on toggles; the editable area is a labelled `textbox`, and mention suggestions are a `listbox` it points at with `aria-activedescendant`.
 - Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
+- The board is a group of labelled column sections. Each card has a labelled Move to select, so a move never needs a pointer, and a polite status region announces each move or refusal. The board is `aria-busy` while a move is saved.
 
 ## Development
 

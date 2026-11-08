@@ -71,4 +71,5 @@
 
     <livewire:editor-demo />
     <livewire:table-demo />
+    <livewire:board-demo />
 </div>
