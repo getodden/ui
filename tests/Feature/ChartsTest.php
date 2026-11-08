@@ -650,3 +650,36 @@ it('thins vertical bar labels that are too wide to sit side by side', function (
     expect(count($geometry['labels']))->toBeLessThan(8)
         ->and($band * (8 / count($geometry['labels'])))->toBeGreaterThan(70);
 });
+
+it('accepts collections and other iterables wherever a chart takes a list', function (): void {
+    $series = collect([collect(['name' => 'Won', 'values' => collect([4, 7])])]);
+    $bar = Html::render('<x-ui::bar-chart label="L" :categories="$categories" :series="$series" />', ['categories' => collect(['Jan', 'Feb']), 'series' => $series]);
+    $donut = Html::render('<x-ui::donut-chart label="L" :segments="$segments" />', ['segments' => collect([['label' => 'A', 'value' => 3], collect(['label' => 'B', 'value' => 1])])]);
+    $sparkline = Html::render('<x-ui::sparkline label="L" :values="$values" />', ['values' => collect([1, 3, 2])]);
+    $stat = Html::render('<x-ui::stat label="L" value="1" :sparkline="$values" />', ['values' => collect([1, 3, 2])]);
+
+    expect($bar->querySelectorAll('svg rect')->length)->toBeGreaterThan(0)
+        ->and($bar->body->textContent)->not->toContain('No data to show')
+        ->and($donut->body->textContent)->toContain('A')->toContain('B')
+        ->and($sparkline->querySelector('svg'))->not->toBeNull()
+        ->and($stat->querySelector('svg'))->not->toBeNull()
+        ->and(ChartData::items(new ArrayIterator([1, 2])))->toBe([1, 2]);
+});
+
+it('draws no sliver for a zero segment in a stacked bar', function (): void {
+    $geometry = ChartGeometry::bars(['a'], [chartSeries('A', [5]), chartSeries('B', [0])], false, true);
+
+    expect(array_column($geometry['bars'], 'series'))->toBe([0]);
+});
+
+it('widens the value gutter to fit the widest tick label', function (): void {
+    $geometry = ChartGeometry::lines(['a', 'b'], [chartSeries('S', [1_000_000, 1_000_010])]);
+    $widest = max(array_map(fn (array $tick): int => strlen($tick['label']), $geometry['ticks']));
+
+    expect($widest * 6.2)->toBeLessThan($geometry['plot']['left'] - 6);
+
+    $bars = ChartGeometry::bars(['a', 'b'], [chartSeries('S', [1e-8, 5e-8])], false, false);
+    $widestBar = max(array_map(fn (array $tick): int => strlen($tick['label']), $bars['ticks']));
+
+    expect($widestBar * 6.2)->toBeLessThan($bars['plot']['left'] - 6);
+});

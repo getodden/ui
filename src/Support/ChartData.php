@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Odden\Ui\Support;
 
+use Illuminate\Contracts\Support\Arrayable;
+
 final class ChartData
 {
     public const int MAXIMUM_CATEGORIES = 366;
@@ -43,6 +45,19 @@ final class ChartData
         );
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
+    public static function items(mixed $input): array
+    {
+        return match (true) {
+            is_array($input) => $input,
+            $input instanceof Arrayable => $input->toArray(),
+            $input instanceof \Traversable => iterator_to_array($input),
+            default => [],
+        };
+    }
+
     public static function text(mixed $value): string
     {
         return is_scalar($value) || $value instanceof \Stringable ? (string) $value : '';
@@ -53,9 +68,7 @@ final class ChartData
      */
     public static function categories(mixed $categories): array
     {
-        if (! is_array($categories)) {
-            return [];
-        }
+        $categories = self::items($categories);
 
         self::within(count($categories), self::MAXIMUM_CATEGORIES, 'categories');
 
@@ -67,16 +80,18 @@ final class ChartData
      */
     public static function series(mixed $series, int $categoryCount): array
     {
-        if (! is_array($series) || $categoryCount === 0) {
+        $series = self::items($series);
+
+        if ($series === [] || $categoryCount === 0) {
             return [];
         }
 
-        $series = array_values(array_filter($series, is_array(...)));
+        $series = array_values(array_filter(array_map(self::items(...), $series), fn (array $entry): bool => $entry !== []));
         self::within(count($series), self::MAXIMUM_SERIES, 'series');
         $normalised = [];
 
         foreach ($series as $index => $entry) {
-            $values = is_array($entry['values'] ?? null) ? array_values($entry['values']) : [];
+            $values = array_values(self::items($entry['values'] ?? null));
             $name = trim(self::text($entry['name'] ?? ''));
 
             $normalised[] = [

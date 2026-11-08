@@ -23,7 +23,7 @@ final class ChartGeometry
     /**
      * @param  list<string>  $categories
      * @param  list<array{name: string, values: list<float|null>}>  $series
-     * @return array{width: float, height: float, horizontal: bool, baseline: float, plot: array{left: float, right: float, top: float, bottom: float}, ticks: list<array{position: float, label: string}>, labels: list<array{position: float, text: string, full: string}>, bars: list<array{x: float, y: float, width: float, height: float, series: int, title: string}>}
+     * @return array{width: float, height: float, horizontal: bool, baseline: float, plot: array{left: float, right: float, top: float, bottom: float}, ticks: list<array{position: float, label: string, anchor: string}>, labels: list<array{position: float, text: string, full: string, anchor: string}>, bars: list<array{x: float, y: float, width: float, height: float, series: int, title: string}>}
      */
     public static function bars(array $categories, array $series, bool $horizontal, bool $stacked): array
     {
@@ -44,6 +44,7 @@ final class ChartGeometry
         }
 
         $ticks = ChartScale::ticks($lowest, $highest);
+        $tickLabels = ChartScale::compactAll($ticks);
         $domainMinimum = $ticks[0];
         $domainMaximum = $ticks[array_key_last($ticks)];
 
@@ -51,7 +52,7 @@ final class ChartGeometry
         $height = $horizontal ? 8.0 + 24.0 + $count * $bandSize : self::VERTICAL_HEIGHT;
         $plot = $horizontal
             ? ['left' => 96.0, 'right' => self::WIDTH - 16.0, 'top' => 8.0, 'bottom' => $height - 24.0]
-            : ['left' => self::VALUE_GUTTER, 'right' => self::WIDTH - 8.0, 'top' => 8.0, 'bottom' => $height - 28.0];
+            : ['left' => self::valueGutter($tickLabels), 'right' => self::WIDTH - 8.0, 'top' => 8.0, 'bottom' => $height - 28.0];
 
         $valueAxis = fn (float $value): float => $horizontal
             ? ChartScale::coordinate($value, $domainMinimum, $domainMaximum, $plot['left'], $plot['right'])
@@ -70,6 +71,10 @@ final class ChartGeometry
 
             foreach ($row as $seriesIndex => $interval) {
                 if ($interval === null) {
+                    continue;
+                }
+
+                if ($stacked && $series[$seriesIndex]['values'][$position] == 0.0) {
                     continue;
                 }
 
@@ -117,7 +122,7 @@ final class ChartGeometry
             'ticks' => array_map(
                 fn (float $tick, string $label): array => ['position' => $valueAxis($tick), 'label' => $label, 'anchor' => $horizontal ? self::anchorWithin($valueAxis($tick), $label) : 'middle'],
                 $ticks,
-                ChartScale::compactAll($ticks),
+                $tickLabels,
             ),
             'labels' => $labels,
             'bars' => $bars,
@@ -127,13 +132,11 @@ final class ChartGeometry
     /**
      * @param  list<string>  $categories
      * @param  list<array{name: string, values: list<float|null>}>  $series
-     * @return array{width: float, height: float, plot: array{left: float, right: float, top: float, bottom: float}, ticks: list<array{position: float, label: string}>, labels: list<array{position: float, text: string, full: string}>, lines: list<array{series: int, path: string|null, points: list<array{x: float, y: float, marker: bool, title: string}>}>}
+     * @return array{width: float, height: float, plot: array{left: float, right: float, top: float, bottom: float}, ticks: list<array{position: float, label: string}>, labels: list<array{position: float, text: string, full: string, anchor: string}>, lines: list<array{series: int, path: string|null, points: list<array{x: float, y: float, marker: bool, title: string}>}>}
      */
     public static function lines(array $categories, array $series): array
     {
         $count = count($categories);
-        $plot = ['left' => self::VALUE_GUTTER, 'right' => self::WIDTH - 12.0, 'top' => 12.0, 'bottom' => self::VERTICAL_HEIGHT - 28.0];
-
         $present = [];
 
         foreach ($series as $entry) {
@@ -155,8 +158,10 @@ final class ChartGeometry
         }
 
         $ticks = ChartScale::ticks($lowest, $highest);
+        $tickLabels = ChartScale::compactAll($ticks);
         $domainMinimum = $ticks[0];
         $domainMaximum = $ticks[array_key_last($ticks)];
+        $plot = ['left' => self::valueGutter($tickLabels), 'right' => self::WIDTH - 12.0, 'top' => 12.0, 'bottom' => self::VERTICAL_HEIGHT - 28.0];
 
         $horizontalAt = fn (int $position): float => $count === 1
             ? round(($plot['left'] + $plot['right']) / 2, 2)
@@ -213,7 +218,7 @@ final class ChartGeometry
             'width' => self::WIDTH,
             'height' => self::VERTICAL_HEIGHT,
             'plot' => $plot,
-            'ticks' => array_map(fn (float $tick, string $label): array => ['position' => $verticalAt($tick), 'label' => $label], $ticks, ChartScale::compactAll($ticks)),
+            'ticks' => array_map(fn (float $tick, string $label): array => ['position' => $verticalAt($tick), 'label' => $label], $ticks, $tickLabels),
             'labels' => $labels,
             'lines' => $lines,
         ];
@@ -301,6 +306,14 @@ final class ChartGeometry
         }
 
         return ['total' => $total, 'segments' => $shapes];
+    }
+
+    /**
+     * @param  list<string>  $labels
+     */
+    private static function valueGutter(array $labels): float
+    {
+        return max(self::VALUE_GUTTER, ceil(max(0.0, ...array_map(self::textWidth(...), $labels)) + 12.0));
     }
 
     /**

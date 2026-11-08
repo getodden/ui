@@ -32,7 +32,8 @@
         'flat' => 'fas-minus',
         default => null,
     };
-    $hasSparkline = is_array($sparkline) && $sparkline !== [];
+    $sparkline = \Odden\Ui\Support\ChartData::items($sparkline);
+    $hasSparkline = $sparkline !== [];
 @endphp
 
 <div {{ $attributes->class(['flex items-end justify-between gap-4 rounded-surface border border-gray-200 bg-white p-5 text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100']) }}>

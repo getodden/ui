@@ -7,8 +7,9 @@
         'A ui::donut-chart needs a label.'
     );
 
-    $segments = collect(is_array($segments) ? array_values($segments) : [])
-        ->filter(fn (mixed $segment): bool => is_array($segment))
+    $segments = collect(array_values(\Odden\Ui\Support\ChartData::items($segments)))
+        ->map(fn (mixed $segment): array => \Odden\Ui\Support\ChartData::items($segment))
+        ->filter(fn (array $segment): bool => $segment !== [])
         ->map(fn (array $segment): array => ['label' => trim(\Odden\Ui\Support\ChartData::text($segment['label'] ?? '')), 'value' => \Odden\Ui\Support\ChartData::number($segment['value'] ?? null) ?? 0.0])
         ->filter(fn (array $segment): bool => $segment['value'] > 0)
         ->values();

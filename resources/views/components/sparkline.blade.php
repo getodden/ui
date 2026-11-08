@@ -7,7 +7,7 @@
         'A ui::sparkline needs a label.'
     );
 
-    $values = is_array($values) ? array_map(\Odden\Ui\Support\ChartData::number(...), array_values($values)) : [];
+    $values = array_map(\Odden\Ui\Support\ChartData::number(...), array_values(\Odden\Ui\Support\ChartData::items($values)));
     \Odden\Ui\Support\ChartData::within(count($values), \Odden\Ui\Support\ChartData::MAXIMUM_CATEGORIES, 'values');
     $hasData = array_filter($values, fn (?float $value): bool => $value !== null) !== [];
     $chartId = $attributes->get('id') ?? \Odden\Ui\Support\ChartData::identifier('sparkline', (string) $label);
