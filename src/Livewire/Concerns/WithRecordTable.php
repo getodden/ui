@@ -196,11 +196,13 @@ trait WithRecordTable
             return;
         }
 
-        $pendingBefore = $this->pendingConfirmation();
+        if ($this->pendingConfirmation() !== []) {
+            return;
+        }
 
         $this->{$action}($keys);
 
-        if ($this->pendingConfirmation() === $pendingBefore) {
+        if ($this->pendingConfirmation() === []) {
             $this->clearSelection();
         }
     }
@@ -424,7 +426,11 @@ trait WithRecordTable
             || ($base->groups ?? []) !== []
             || ($base->havings ?? []) !== []
             || ($base->unions ?? []) !== []
-            || $base->columns !== null;
+            || $base->columns !== null
+            || $base->limit !== null
+            || $base->offset !== null
+            || $base->lock !== null
+            || $base->distinct !== false;
 
         $removedScopes = $group instanceof EloquentBuilder ? $group->removedScopes() : [];
 
@@ -487,11 +493,17 @@ trait WithRecordTable
 
         $column = $this->recordKeyColumn();
 
-        if ($column === null) {
-            return $query->whereKey($this->selectedKeys());
+        if ($column !== null) {
+            return $query->whereIn($column, $this->selectedKeys());
         }
 
-        return $query->whereIn($column, $this->selectedKeys());
+        $keys = $this->selectedKeys();
+
+        if ($query->getModel()->getKeyType() === 'int') {
+            $keys = array_values(array_filter($keys, ctype_digit(...)));
+        }
+
+        return $query->whereKey($keys);
     }
 
     protected function recordKeyColumn(): ?string

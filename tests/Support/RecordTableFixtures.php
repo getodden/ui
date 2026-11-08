@@ -53,6 +53,7 @@ final class RecordTableFixtures
             $table->string('colour');
             $table->unsignedInteger('price');
             $table->timestamps();
+            $table->softDeletes();
         });
 
         foreach (self::FRUIT as [$name, $colour, $price]) {

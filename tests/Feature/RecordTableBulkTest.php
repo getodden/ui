@@ -10,9 +10,11 @@ use Odden\Ui\Support\RecordTableReads;
 use Odden\Ui\Tests\Support\BulkRecordTableComponent;
 use Odden\Ui\Tests\Support\Html;
 use Odden\Ui\Tests\Support\NameKeyedRecordTableComponent;
+use Odden\Ui\Tests\Support\NameKeyOnlyRecordTableComponent;
 use Odden\Ui\Tests\Support\OwnConfirmingFlagRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
 use Odden\Ui\Tests\Support\ScopeStrippingTabRecordTableComponent;
+use Odden\Ui\Tests\Support\TrashedTabRecordTableComponent;
 use Odden\Ui\Tests\Support\UnsafeTabRecordTableComponent;
 use Odden\Ui\Tests\Support\WideRecordTableComponent;
 use Workbench\App\Models\Fruit;
@@ -321,7 +323,7 @@ it('groups a tab scope so its or conditions cannot escape the search', function 
     $component->assertSee('Apple')->assertDontSee('Raspberry')->assertDontSee('Date');
 });
 
-it('keeps the selection after a bulk action only when the component uses WithConfirmation', function (): void {
+it('clears the selection after a bulk action when the component has its own confirming flag', function (): void {
     $ids = fruitIds('Apple');
     $component = Livewire::test(OwnConfirmingFlagRecordTableComponent::class)->set('selected', $ids)->call('runBulkAction', 'recordSelection');
 
@@ -353,7 +355,7 @@ it('keeps a selection keyed by something other than the primary key when the hos
     expect(json_decode($component->instance()->report(), true))->toBe(['Apple']);
 });
 
-it('keeps the selection when a client-set confirming flag is raised but no confirmation was asked', function (): void {
+it('clears the selection when confirming is set by the client without a pending confirmation', function (): void {
     $ids = fruitIds('Apple');
     $component = Livewire::test(BulkRecordTableComponent::class)->set('selected', $ids)->set('confirming', true)->call('runBulkAction', 'recordSelection');
 
@@ -375,6 +377,10 @@ it('leaves setPage declared by the pagination trait so write guards keep matchin
     expect((new ReflectionMethod(BulkRecordTableComponent::class, 'setPage'))->getFileName())->toContain('HandlesPagination.php');
 });
 
+it('resolves selected records through selectedRecords in the README archive example', function (): void {
+    expect(file_get_contents(__DIR__.'/../../README.md'))->not->toContain('Contact::query()->whereKey($keys)');
+});
+
 it('quotes record keys in the README examples', function (): void {
     expect(file_get_contents(__DIR__.'/../../README.md'))->not->toMatch('/wire:click="\w+\(\{\{ \$/');
 });
@@ -385,10 +391,36 @@ it('refuses a tab scope that removes a global scope', function (): void {
 });
 
 it('lets a tab scope lift the soft-deleting scope', function (): void {
-    $component = new ScopeStrippingTabRecordTableComponent;
-    $component->stripGuard = false;
+    $ids = fruitIds('Apple', 'Banana');
+    Fruit::query()->whereKey($ids[0])->update(['deleted_at' => now()]);
+    $component = new TrashedTabRecordTableComponent;
+    $component->selected = $ids;
 
-    expect($component->names())->toBe(['Apple', 'Cherry', 'Cranberry', 'Dragonfruit', 'Lychee', 'Raspberry']);
+    expect($component->names())->toBe(['Apple'])
+        ->and($component->selectedNames())->toBe(['Apple']);
+});
+
+it('refuses a tab scope that adds a limit, offset, lock or distinct', function (string $method): void {
+    $component = new UnsafeTabRecordTableComponent;
+    $component->scope = fn ($query) => $query->where('colour', 'red')->{$method}(1);
+
+    expect(fn () => $component->names())->toThrow(LogicException::class, 'Tab [newest] may only add where clauses.');
+})->with(['limit' => 'take', 'offset' => 'skip', 'lock' => 'lock', 'distinct' => 'distinct']);
+
+it('keeps the selection while a confirmation is pending even when the action is run twice', function (): void {
+    $ids = fruitIds('Apple');
+    $component = Livewire::test(BulkRecordTableComponent::class)->set('selected', $ids)
+        ->call('runBulkAction', 'askToRemove')
+        ->call('runBulkAction', 'askToRemove');
+
+    expect($component->get('selected'))->toBe($ids);
+});
+
+it('selects nothing when the host overrides only recordKey on an integer-keyed model', function (): void {
+    $component = new NameKeyOnlyRecordTableComponent;
+    $component->selected = ['12ab3c', 'Apple'];
+
+    expect($component->selectedNames())->toBe([]);
 });
 
 it('resolves selected keys through the active tab at action time', function (): void {

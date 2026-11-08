@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Odden\Ui\Tests\Support;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Component;
 use Odden\Ui\Livewire\Concerns\WithRecordTable;
@@ -14,8 +13,6 @@ use Workbench\App\Models\Fruit;
 final class ScopeStrippingTabRecordTableComponent extends Component
 {
     use WithRecordTable;
-
-    public bool $stripGuard = true;
 
     /**
      * @return array<string, string>
@@ -30,10 +27,8 @@ final class ScopeStrippingTabRecordTableComponent extends Component
      */
     protected function recordTabs(): array
     {
-        $scope = $this->stripGuard ? 'guard' : SoftDeletingScope::class;
-
         return [
-            'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query->withoutGlobalScope($scope)->where('price', '>', 0)],
+            'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query->withoutGlobalScope('guard')->where('price', '>', 0)],
         ];
     }
 
