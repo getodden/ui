@@ -339,3 +339,103 @@ it('moves between radios with the arrow keys', function (): void {
 it('describes the currency input by its code', function (): void {
     visit('/')->assertScript('document.getElementById("ui-amount").getAttribute("aria-describedby").split(" ").some((id) => document.getElementById(id).textContent.trim() === "USD")');
 });
+
+it('keeps a picked combobox value on the server when the component re-renders', function (): void {
+    $page = visit('/');
+
+    $page->type(CUSTOMER, 'turing');
+    $page->script(formsSettled('true'));
+    $page->click('#customer-option-0')->assertScript(FORMS_WIRE.'.customer === "3"');
+
+    $page->script(formsSettled('true'));
+    $page->click('#forms-refresh');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript(FORMS_WIRE.'.customer === "3"')
+        ->assertScript('document.querySelector("'.CUSTOMER.'").value === "Alan Turing"');
+});
+
+it('keeps the multiselect choice on the server when its options change', function (): void {
+    $page = visit('/');
+
+    $page->click('#forms-more-tags');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript('JSON.stringify('.FORMS_WIRE.'.tags) === JSON.stringify(["b"])')
+        ->assertScript('document.querySelector("'.TAGS_BUTTON.'").textContent.trim() === "Beta"')
+        ->click(TAGS_BUTTON);
+
+    $page->script('document.getElementById("ui-tags-option-0").click()');
+
+    $page->assertScript('JSON.stringify('.FORMS_WIRE.'.tags) === JSON.stringify(["b", "x"])')
+        ->assertScript('document.querySelector("'.TAGS_BUTTON.'").textContent.trim() === "Beta, Xray"');
+});
+
+it('keeps the selected tab on the server when the tab list changes', function (): void {
+    $page = visit('/');
+
+    $page->click('Files')->assertScript(FORMS_WIRE.'.tab === "files"');
+    $page->click('#forms-more-tabs');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript(FORMS_WIRE.'.tab === "files"')
+        ->assertScript('document.querySelectorAll("#forms-tabs [role=tab]").length === 4')
+        ->assertScript('document.querySelector("#forms-tabs [role=tab][aria-selected=true]").textContent.trim() === "Files"')
+        ->assertSee('Files panel')
+        ->assertDontSee('Details panel');
+});
+
+it('marks the keyboard-active combobox and multiselect options with a ring', function (): void {
+    $page = visit('/');
+
+    $page->type(CUSTOMER, 'grace');
+    $page->script(formsSettled('true'));
+    $page->keys(CUSTOMER, 'ArrowDown')
+        ->assertScript('document.getElementById("customer-option-0").classList.contains("ring-2")')
+        ->assertScript('document.getElementById("customer-option-1").classList.contains("ring-2") === false');
+
+    $page->click(TAGS_BUTTON)
+        ->assertScript('document.getElementById("ui-tags-option-1").classList.contains("ring-2")')
+        ->assertScript('document.getElementById("ui-tags-option-0").classList.contains("ring-2") === false');
+});
+
+it('says so when the combobox search fails', function (): void {
+    $page = visit('/');
+
+    $page->script('window.fetch = () => Promise.reject(new TypeError("offline")); true');
+
+    $page->type(CUSTOMER, 'boom');
+    $page->script(formsSettled('true', 1500));
+
+    $page->assertNoJavaScriptErrors()
+        ->assertSee('Search failed. Try again.')
+        ->assertScript('[...document.querySelectorAll("[role=status]")].some((region) => region.textContent.includes("Search failed"))')
+        ->assertScript(isHidden(CUSTOMER_LISTBOX));
+});
+
+it('waits for the minimum number of characters before searching', function (): void {
+    $page = visit('/');
+
+    $page->script('window.requests = 0; const original = window.fetch; window.fetch = (...arguments_) => { if (String(arguments_[0]).includes("livewire")) { window.requests++ } return original(...arguments_) }');
+
+    $page->type('#owner', 'gr');
+    $page->script(formsSettled('true'));
+
+    expect($page->script('window.requests'))->toBe(0);
+
+    $page->type('#owner', 'gra');
+
+    expect($page->script(formsSettled(visibleOptions('#owner-listbox'))))->toBe(['Grace Hopper', 'Grace Kelly'])
+        ->and($page->script('window.requests'))->toBe(1);
+});
+
+it('does not run a disabled menu item when it is activated', function (): void {
+    $page = visit('/');
+
+    $page->click(MENU_TRIGGER);
+    $page->script('document.getElementById("menu-disabled").click()');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript('document.getElementById("menu-disabled").tagName === "BUTTON"')
+        ->assertScript('document.getElementById("last-action").textContent === ""');
+});

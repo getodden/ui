@@ -148,9 +148,9 @@ it('renders a multiselect as a labelled combobox over a multiselectable listbox'
 });
 
 it('seeds the multiselect with the given values as strings', function (): void {
-    $xData = Html::render('<x-ui::multiselect label="Tags" name="tags" :options="[1 => \'One\', 2 => \'Two\']" :value="[2]" />')->querySelector('[x-data]')->getAttribute('x-data');
+    $initial = Html::render('<x-ui::multiselect label="Tags" name="tags" :options="[1 => \'One\', 2 => \'Two\']" :value="[2]" />')->querySelector('[x-data]')->getAttribute('data-initial');
 
-    expect($xData)->toContain('selected: JSON.parse(\'[\\u00222\\u0022]\')');
+    expect($initial)->toBe('["2"]');
 });
 
 it('posts the multiselect values under its name only when a name is given', function (): void {
@@ -349,4 +349,44 @@ it('renders an empty state with heading, description and actions', function (): 
         ->and($dom->querySelector('p')->textContent)->toBe('Add one.')
         ->and($dom->querySelector('svg')->getAttribute('aria-hidden'))->toBe('true')
         ->and($dom->querySelector('a')->getAttribute('href'))->toBe('/new');
+});
+
+it('exposes a required multiselect as required to assistive technology', function (): void {
+    $required = Html::render('<x-ui::multiselect label="Tags" name="tags" :options="[\'a\' => \'A\']" required />')->querySelector('button[role=combobox]');
+    $optional = Html::render('<x-ui::multiselect label="Tags" name="tags" :options="[\'a\' => \'A\']" />')->querySelector('button[role=combobox]');
+
+    expect($required->getAttribute('aria-required'))->toBe('true')
+        ->and($required->hasAttribute('required'))->toBeFalse()
+        ->and($optional->hasAttribute('aria-required'))->toBeFalse();
+});
+
+it('makes room for a currency symbol of any length', function (string $symbol, string $padding): void {
+    $input = Html::render('<x-ui::currency label="Amount" name="amount" symbol="'.$symbol.'" />')->querySelector('input');
+
+    expect($input->getAttribute('style'))->toBe('padding-left: calc(1.25rem + '.$padding.'ch);');
+})->with([
+    'one character' => ['$', '1'],
+    'two characters' => ['kr', '2'],
+    'three characters' => ['CHF', '3'],
+]);
+
+it('shows a visible focus indicator on a focused menu item', function (): void {
+    $item = Html::render('<x-ui::dropdown.item>Export</x-ui::dropdown.item>')->querySelector('[role=menuitem]');
+
+    expect($item->getAttribute('class'))->toContain('focus-visible:outline-primary-700')
+        ->and($item->getAttribute('class'))->not->toContain('focus-visible:outline-none');
+});
+
+it('keeps server values out of the x-data of the combobox, multiselect and tabs', function (): void {
+    $combobox = Html::render('<x-ui::combobox label="Customer" wire:model="customer" search="find" value="7" value-label="Ada" />')->querySelector('[x-modelable]');
+    $multiselect = Html::render('<x-ui::multiselect label="Tags" wire:model="tags" :options="[\'a\' => \'Alpha\']" :value="[\'a\']" />')->querySelector('[x-modelable]');
+    $tabs = Html::render('<x-ui::tabs id="t" label="Sections" wire:model="tab" selected="b" :tabs="[\'a\' => \'A\', \'b\' => \'B\']" />')->querySelector('[x-modelable]');
+
+    expect($combobox->getAttribute('x-data'))->not->toContain('Ada')->not->toContain('"7"')
+        ->and($combobox->getAttribute('data-value'))->toBe('7')
+        ->and($combobox->getAttribute('data-label'))->toBe('Ada')
+        ->and($multiselect->getAttribute('x-data'))->not->toContain('Alpha')
+        ->and($multiselect->getAttribute('data-initial'))->toBe('["a"]')
+        ->and($tabs->getAttribute('x-data'))->not->toContain('"b"')
+        ->and($tabs->getAttribute('data-initial'))->toBe('b');
 });
