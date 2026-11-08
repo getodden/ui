@@ -7,11 +7,11 @@
     $rows = array_values($rows);
     $itemLabel = filled($itemLabel) ? $itemLabel : __('ui::ui.repeater.item');
     $spec = isset($this) && method_exists($this, 'repeaterSpec') ? $this->repeaterSpec((string) $name) : null;
+    throw_if(isset($this) && method_exists($this, 'repeaterSpec') && $spec === null, \InvalidArgumentException::class, 'The repeater ['.$name.'] is not registered in repeaters() of its component, or is not an array property of it.');
     $atMaximum = $spec?->max !== null && count($rows) >= $spec->max;
 
     $config = [
         'name' => $name,
-        'itemLabel' => $itemLabel,
         'messages' => [
             'added' => __('ui::ui.repeater.added', ['row' => ':row']),
             'removed' => __('ui::ui.repeater.removed', ['row' => ':row']),
@@ -47,6 +47,11 @@
 
         this.status = this.fill(template, { row: title, position: rows.indexOf(row) + 1, total: rows.length })
     },
+    async announceFresh(write) {
+        this.status = ''
+        await this.$nextTick()
+        write()
+    },
     async settle(call) {
         await call
         await this.$nextTick()
@@ -59,7 +64,7 @@
         const row = this.rowElements().find((candidate) => ! before.includes(candidate.dataset.repeaterKey))
 
         if (row) {
-            this.announce(config.messages.added, row)
+            await this.announceFresh(() => this.announce(config.messages.added, row))
             row.querySelector('input:not([type=hidden]), select, textarea, [contenteditable=true]')?.focus()
         }
     },
@@ -72,7 +77,7 @@
             return
         }
 
-        this.status = this.fill(config.messages.removed, { row: title })
+        await this.announceFresh(() => { this.status = this.fill(config.messages.removed, { row: title }) })
 
         const rows = this.rowElements()
         const next = rows[Math.min(position, rows.length - 1)]
@@ -95,7 +100,7 @@
 
         const row = this.rowElement(key)
 
-        this.announce(config.messages.moved, row, title)
+        await this.announceFresh(() => this.announce(config.messages.moved, row, title))
 
         const preferred = row.querySelector('[data-repeater-action=' + direction + ']:not([disabled])')
         const fallback = row.querySelector('[data-repeater-action]:not([disabled])')
@@ -113,9 +118,14 @@
             event.preventDefault()
         }
     },
-    async drop(targetKey) {
+    async drop(event, targetKey) {
         const dragged = this.dragging
 
+        if (dragged === null) {
+            return
+        }
+
+        event.preventDefault()
         this.dragging = null
 
         const keys = this.rowKeys()
@@ -137,7 +147,7 @@
             return
         }
 
-        this.announce(config.messages.moved, this.rowElement(dragged), title)
+        await this.announceFresh(() => this.announce(config.messages.moved, this.rowElement(dragged), title))
     },
 })
 JS;

@@ -73,6 +73,7 @@ return [
     ],
     'repeater' => [
         'item' => 'Item',
+        'title' => ':item :number',
         'add' => 'Add item',
         'empty' => 'Nothing added yet.',
         'move_up' => 'Move :row up',

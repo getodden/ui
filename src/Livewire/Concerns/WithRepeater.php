@@ -7,12 +7,18 @@ namespace Odden\Ui\Livewire\Concerns;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\MessageBag;
+use Illuminate\Support\Str;
 use Odden\Ui\Enums\RepeaterDirection;
 use Odden\Ui\Support\RepeaterRows;
 use Odden\Ui\Support\RepeaterSpec;
 
 trait WithRepeater
 {
+    /**
+     * @var array<string, int>
+     */
+    protected array $repeaterCountsBeforeUpdate = [];
+
     /**
      * @return array<string, RepeaterSpec>
      */
@@ -60,15 +66,35 @@ trait WithRepeater
         $this->keyRepeaterRows();
     }
 
+    public function updatingWithRepeater(string $path): void
+    {
+        $property = Str::before($path, '.');
+
+        if ($this->repeaterSpec($property) !== null) {
+            $this->repeaterCountsBeforeUpdate[$property] = count($this->{$property});
+        }
+    }
+
     public function updatedWithRepeater(string $path): void
     {
-        foreach (array_keys($this->repeaters()) as $property) {
-            $spec = $this->repeaterSpec((string) $property);
+        $property = Str::before($path, '.');
+        $spec = $this->repeaterSpec($property);
 
-            if ($spec !== null) {
-                $this->{$property} = RepeaterRows::within(RepeaterRows::onlyRows($this->{$property}), $spec);
-            }
+        if ($spec === null) {
+            return;
         }
+
+        $countBefore = $this->repeaterCountsBeforeUpdate[$property] ?? null;
+        unset($this->repeaterCountsBeforeUpdate[$property]);
+
+        $submitted = array_values($this->{$property});
+        $before = RepeaterRows::withKeys(array_map(fn (mixed $row): array => is_array($row) ? $row : [], $submitted));
+        $kept = array_values(array_filter($before, fn (array $row, int $position): bool => is_array($submitted[$position]), ARRAY_FILTER_USE_BOTH));
+        $after = count($kept) === $countBefore ? $kept : RepeaterRows::within($kept, $spec);
+
+        $this->{$property} = $after;
+
+        $this->moveRepeaterErrors($property, array_column($before, RepeaterRows::KEY), array_column($after, RepeaterRows::KEY));
     }
 
     public function renderingWithRepeater(?View $view = null): void

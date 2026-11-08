@@ -9,6 +9,7 @@ use Odden\Ui\Support\RepeaterRows;
 use Odden\Ui\Support\RepeaterSpec;
 use Odden\Ui\Tests\Support\Html;
 use Odden\Ui\Tests\Support\RepeaterComponent;
+use Odden\Ui\Tests\Support\UnregisteredRepeaterComponent;
 
 function repeaterNames(mixed $items): array
 {
@@ -235,7 +236,7 @@ it('puts a tampered key safely into the row attributes', function (): void {
 
     expect($dom->querySelector('script'))->toBeNull()
         ->and($dom->querySelector('li')->getAttribute('data-repeater-key'))->toBe($key)
-        ->and($dom->querySelector('li')->getAttribute('x-on:drop.prevent'))->not->toContain('<script>');
+        ->and($dom->querySelector('li')->getAttribute('x-on:drop'))->not->toContain('<script>');
 });
 
 it('keeps a row error with its row when rows move, reorder or are removed', function (): void {
@@ -320,4 +321,67 @@ it('cuts a row update that grows the property past the maximum', function (): vo
 
 it('answers a render hook called from the browser without failing', function (): void {
     Livewire::test(RepeaterComponent::class)->call('renderingWithRepeater')->assertOk();
+});
+
+it('leaves a repeater alone when another property is updated', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->call('loadOverMaximum')->set('untouched', 'changed');
+
+    expect($component->get('items'))->toHaveCount(6)
+        ->and(repeaterNames($component->get('items'))[5])->toBe('Stored 6');
+});
+
+it('keeps a row error with its row when a browser update reindexes the rows', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->call('loadOverMaximum')->call('save');
+
+    expect($component->errors()->keys())->toBe(['items.2.name']);
+
+    $component->set('items.0', 'junk');
+
+    expect($component->errors()->keys())->toBe(['items.1.name'])
+        ->and($component->get('items')[1]['name'])->toBe('');
+});
+
+it('keeps row errors in place when a field inside a row is edited', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->set('items.1.name', 'x')->call('save')->set('items.0.name', 'Firstly');
+
+    expect($component->errors()->keys())->toBe(['items.1.name']);
+});
+
+it('refuses a repeater whose property is not registered', function (): void {
+    try {
+        Livewire::test(UnregisteredRepeaterComponent::class);
+    } finally {
+        Livewire::flushState();
+    }
+})->throws(ViewException::class, 'is not registered in repeaters()');
+
+it('scopes the row ids to the repeater id', function (): void {
+    $dom = Html::render('<x-ui::repeater label="L" name="items" id="first" :rows="$rows"><x-ui::repeater.row :index="0">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => RepeaterRows::withKeys([['name' => 'a']])]);
+
+    expect($dom->getElementById('first-row-0-title'))->not->toBeNull();
+});
+
+it('orders the row title through the translation', function (): void {
+    app('translator')->addLines(['ui.repeater.title' => '#:number :item'], 'en', 'ui');
+
+    $component = Livewire::test(RepeaterComponent::class);
+
+    expect(Html::render($component->html())->getElementById('ui-items-row-0-title')->textContent)->toBe('#1 Person');
+});
+
+it('keeps rows loaded over the maximum when a field inside a row is edited', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->call('loadOverMaximum')->set('items.0.name', 'Edited');
+
+    expect($component->get('items'))->toHaveCount(6)
+        ->and(repeaterNames($component->get('items'))[0])->toBe('Edited');
+});
+
+it('refuses a spec whose limits contradict each other', function (int $min, ?int $max): void {
+    new RepeaterSpec(min: $min, max: $max);
+})->with([[3, 2], [-1, null], [0, -1]])->throws(InvalidArgumentException::class);
+
+it('titles a row by the title it is given', function (): void {
+    $dom = Html::render('<x-ui::repeater label="L" name="items" id="first" :rows="$rows"><x-ui::repeater.row :index="0" title="Mobile">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => RepeaterRows::withKeys([['name' => 'a']])]);
+
+    expect($dom->getElementById('first-row-0-title')->textContent)->toBe('Mobile');
 });

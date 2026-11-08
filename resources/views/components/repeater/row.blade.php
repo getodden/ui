@@ -1,25 +1,30 @@
-@props(['index'])
+@props(['index', 'title' => null])
 
-@aware(['name', 'rows' => [], 'itemLabel' => null])
+@aware(['name', 'id' => null, 'rows' => [], 'itemLabel' => null])
 
 @php
     $rows = array_values($rows);
+    $hasSpecs = isset($this) && method_exists($this, 'repeaterSpec');
+    $spec = $hasSpecs ? $this->repeaterSpec((string) $name) : null;
+
+    throw_if($hasSpecs && $spec === null, \InvalidArgumentException::class, 'The repeater ['.$name.'] is not registered in repeaters() of its component, or is not an array property of it.');
+
     $key = $rows[$index][\Odden\Ui\Support\RepeaterRows::KEY] ?? null;
 
     throw_unless(is_string($key) && $key !== '', \InvalidArgumentException::class, 'A ui::repeater.row needs a row with a key; use the WithRepeater trait or Odden\Ui\Support\RepeaterRows::withKeys().');
 
     $itemLabel = filled($itemLabel) ? $itemLabel : __('ui::ui.repeater.item');
-    $title = $itemLabel.' '.($index + 1);
-    $titleId = 'ui-'.trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $name), '-').'-row-'.$index.'-title';
+    $title = filled($title) ? $title : __('ui::ui.repeater.title', ['item' => $itemLabel, 'number' => $index + 1]);
+    $titleId = (filled($id) ? $id : \Odden\Ui\Support\FieldState::idFromName($name)).'-row-'.$index.'-title';
     $keyScript = \Illuminate\Support\Js::from($key);
-    $canRemove = count($rows) > ((isset($this) && method_exists($this, 'repeaterSpec') ? $this->repeaterSpec((string) $name)?->min : null) ?? 0);
+    $canRemove = count($rows) > ($spec?->min ?? 0);
     $rowErrors = ($errors ?? null) instanceof \Illuminate\Support\ViewErrorBag ? $errors->getBag('default') : null;
     $rowError = $rowErrors?->first($name.'.'.$index);
     $rowError = filled($rowError) ? $rowError : null;
     $errorId = $titleId.'-error';
 @endphp
 
-<li wire:key="{{ $name }}-row-{{ $key }}" data-repeater-key="{{ $key }}" x-bind:class="dragging === {{ $keyScript }} ? 'opacity-50' : ''" x-on:dragover="allowDrop($event)" x-on:drop.prevent="drop({{ $keyScript }})">
+<li wire:key="{{ $name }}-row-{{ $key }}" data-repeater-key="{{ $key }}" x-bind:class="dragging === {{ $keyScript }} ? 'opacity-50' : ''" x-on:dragover="allowDrop($event)" x-on:drop="drop($event, {{ $keyScript }})">
     <div role="group" aria-labelledby="{{ $titleId }}" tabindex="-1" data-repeater-row {{ $attributes->merge(array_filter(['aria-describedby' => $rowError === null ? null : $errorId]))->class(['flex items-start gap-3 rounded-surface border border-gray-200 bg-white p-4 text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400']) }}>
         <span aria-hidden="true" draggable="true" class="mt-0.5 cursor-grab text-gray-500 dark:text-gray-400" x-on:dragstart="startDrag($event, {{ $keyScript }})" x-on:dragend="dragging = null">
             <x-ui::icon name="fas-grip-vertical" />

@@ -27,6 +27,11 @@ final class RepeaterDemo extends Component
      */
     public array $nicknames = [['label' => 'Chief']];
 
+    /**
+     * @var list<array<string, mixed>>
+     */
+    public array $plans = [['label' => 'Basic']];
+
     public bool $saved = false;
 
     /**
@@ -37,6 +42,7 @@ final class RepeaterDemo extends Component
         return [
             'phones' => new RepeaterSpec(min: 1, max: 5, blank: ['label' => '', 'number' => '']),
             'nicknames' => new RepeaterSpec(max: 3, blank: ['label' => '']),
+            'plans' => new RepeaterSpec(max: 3, blank: ['label' => '']),
         ];
     }
 

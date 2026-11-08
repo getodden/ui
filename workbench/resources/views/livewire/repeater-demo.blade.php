@@ -24,6 +24,16 @@
         </x-ui::repeater>
     </div>
 
+    <div id="plan-repeater">
+        <x-ui::repeater label="Plans" name="plans" :rows="$plans" item-label="Plan :position $&" add-label="Add plan">
+            @foreach ($plans as $index => $plan)
+                <x-ui::repeater.row :index="$index">
+                    <x-ui::input label="Label" wire:model="plans.{{ $index }}.label" />
+                </x-ui::repeater.row>
+            @endforeach
+        </x-ui::repeater>
+    </div>
+
     @if ($saved)
         <p id="repeater-saved">Saved</p>
     @endif

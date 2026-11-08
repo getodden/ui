@@ -47,6 +47,12 @@ final class RepeaterComponent extends Component
         $this->items = [['name' => 'From storage']];
     }
 
+    public function loadOverMaximum(): void
+    {
+        $this->items = array_map(fn (int $number): array => ['name' => 'Stored '.$number], range(1, 6));
+        $this->items[2]['name'] = '';
+    }
+
     public function resetItems(): void
     {
         $this->reset('items');

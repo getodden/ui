@@ -59,7 +59,7 @@ final readonly class FieldState
         ], fn (string|bool|null $value): bool => $value !== null));
     }
 
-    private static function idFromName(?string $name): string
+    public static function idFromName(?string $name): string
     {
         if ($name === null) {
             return 'ui-field-'.Str::lower(Str::random(8));

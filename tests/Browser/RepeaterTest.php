@@ -115,3 +115,29 @@ it('puts focus on the add button after the last row is removed', function (): vo
         ->assertScript('document.activeElement === document.querySelector("#nickname-repeater [data-repeater-add]")')
         ->assertScript('document.querySelector("#nickname-repeater [role=status]").textContent === "Nickname 1 removed"');
 });
+
+it('announces a row title that holds replacement patterns exactly as written', function (): void {
+    $page = visit('/');
+
+    $page->click('#plan-repeater [data-repeater-add]')
+        ->wait(0.5)
+        ->assertScript('document.querySelector("#plan-repeater [role=status]").textContent === "Plan :position $& 2 added"');
+});
+
+it('lets a drop that is not a row drag reach the field inside a row', function (): void {
+    $page = visit('/');
+
+    $page->assertScript('(() => { const row = document.querySelector("#repeater-form li:nth-child(1) input"); const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }); row.dispatchEvent(drop); return drop.defaultPrevented === false })()');
+});
+
+it('announces again when the same message comes twice in a row', function (): void {
+    $page = visit('/');
+
+    $page->click(repeaterRow(1).' [data-repeater-action=remove]')
+        ->wait(0.5)
+        ->script('(() => { window.announcements = []; const status = document.querySelector("#repeater-form [role=status]"); new MutationObserver(() => window.announcements.push(status.textContent)).observe(status, { childList: true, characterData: true, subtree: true }); })()');
+
+    $page->click(repeaterRow(1).' [data-repeater-action=remove]')
+        ->wait(0.5)
+        ->assertScript('window.announcements.filter((text) => text !== "").length === 1');
+});
