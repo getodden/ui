@@ -20,8 +20,8 @@ function keyOf(mixed $component, int $index): string
     return $component->get('items')[$index]['_key'];
 }
 
-it('gives every row a unique key and drops what is not a row', function (): void {
-    $rows = RepeaterRows::withKeys([['name' => 'a'], 'junk', ['name' => 'b', '_key' => 'same'], ['name' => 'c', '_key' => 'same'], ['name' => 'd', '_key' => '']]);
+it('gives every row a unique key', function (): void {
+    $rows = RepeaterRows::withKeys([['name' => 'a'], ['name' => 'b', '_key' => 'same'], ['name' => 'c', '_key' => 'same'], ['name' => 'd', '_key' => '']]);
 
     $keys = array_column($rows, '_key');
 
@@ -29,6 +29,18 @@ it('gives every row a unique key and drops what is not a row', function (): void
         ->and($keys[1])->toBe('same')
         ->and(array_unique($keys))->toHaveCount(4)
         ->and(array_search('', $keys, true))->toBeFalse();
+});
+
+it('refuses rows that are not arrays when keying and drops them from browser input', function (): void {
+    expect(RepeaterRows::onlyRows(['junk', ['name' => 'a'], 3]))->toBe([['name' => 'a']]);
+
+    RepeaterRows::withKeys(['a@x.com', 'b@x.com']);
+})->throws(InvalidArgumentException::class);
+
+it('strips the keys before saving', function (): void {
+    $rows = RepeaterRows::withKeys([['name' => 'a'], ['name' => 'b']]);
+
+    expect(RepeaterRows::withoutKeys($rows))->toBe([['name' => 'a'], ['name' => 'b']]);
 });
 
 it('keeps existing keys across calls', function (): void {
@@ -83,7 +95,8 @@ it('reorders only to a full permutation of the current keys', function (): void 
         ->and(RepeaterRows::reorder($rows, [$a, $b]))->toBe($rows)
         ->and(RepeaterRows::reorder($rows, [$a, $a, $b]))->toBe($rows)
         ->and(RepeaterRows::reorder($rows, [$a, $b, 'other']))->toBe($rows)
-        ->and(RepeaterRows::reorder($rows, ['x' => $a, 'y' => $b, 'z' => $c]))->toBe($rows);
+        ->and(RepeaterRows::reorder($rows, ['x' => $a, 'y' => $b, 'z' => $c]))->toBe($rows)
+        ->and(RepeaterRows::reorder($rows, [['x'], $a, $b]))->toBe($rows);
 });
 
 it('keys the rows when the component first renders', function (): void {
@@ -229,4 +242,53 @@ it('puts a tampered key safely into the row attributes', function (): void {
     expect($dom->querySelector('script'))->toBeNull()
         ->and($dom->querySelector('li')->getAttribute('data-repeater-key'))->toBe($key)
         ->and($dom->querySelector('li')->getAttribute('x-on:drop.prevent'))->not->toContain('<script>');
+});
+
+it('keeps a row error with its row when rows move, reorder or are removed', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->set('items.1.name', 'x')->call('save');
+    $bad = keyOf($component, 1);
+
+    $component->call('moveRepeaterRow', 'items', $bad, 'up');
+    expect($component->errors()->keys())->toBe(['items.0.name']);
+
+    $keys = array_column($component->get('items'), '_key');
+    $component->call('reorderRepeaterRows', 'items', array_reverse($keys));
+    expect($component->errors()->keys())->toBe(['items.2.name']);
+
+    $component->call('removeRepeaterRow', 'items', keyOf($component, 0));
+    expect($component->errors()->keys())->toBe(['items.1.name']);
+
+    $component->call('removeRepeaterRow', 'items', $bad);
+    expect($component->errors()->keys())->toBe([]);
+});
+
+it('keys rows that an action assigns or resets', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->call('loadFromStorage');
+
+    $component->assertSee('Person 1')->assertDontSee('Person 2');
+    expect(array_filter(array_column($component->get('items'), '_key')))->toHaveCount(1);
+
+    $component->call('resetItems')->assertSee('Person 3');
+    expect(array_filter(array_column($component->get('items'), '_key')))->toHaveCount(3);
+});
+
+it('shows a message on the row itself', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->call('saveWithoutKeyAllowance');
+
+    $rows = Html::render($component->html())->querySelectorAll('li[data-repeater-key]');
+
+    expect($rows)->toHaveCount(3)
+        ->and($rows[1]->querySelector('p[id$="-error"]')?->textContent)->toContain('items.1')
+        ->and($rows[1]->querySelector('[data-repeater-row]')->getAttribute('aria-describedby'))->toBe('ui-items-row-1-title-error');
+
+    Livewire::test(RepeaterComponent::class)->call('saveStrictly')->assertHasNoErrors();
+});
+
+it('ignores a reorder holding something other than keys', function (): void {
+    $component = Livewire::test(RepeaterComponent::class);
+    $before = $component->get('items');
+
+    $component->call('reorderRepeaterRows', 'items', [['x'], 'k', 'j']);
+
+    expect($component->get('items'))->toBe($before);
 });

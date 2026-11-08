@@ -5,11 +5,38 @@ declare(strict_types=1);
 namespace Odden\Ui\Support;
 
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 use Odden\Ui\Enums\RepeaterDirection;
 
 final class RepeaterRows
 {
     public const KEY = '_key';
+
+    /**
+     * @param  array<mixed>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public static function onlyRows(array $rows): array
+    {
+        return array_values(array_filter($rows, is_array(...)));
+    }
+
+    /**
+     * @param  array<mixed>  $rows
+     * @return list<array<string, mixed>>
+     */
+    public static function withoutKeys(array $rows): array
+    {
+        return array_map(function (mixed $row): array {
+            if (! is_array($row)) {
+                throw new InvalidArgumentException('A repeater row must be an array.');
+            }
+
+            unset($row[self::KEY]);
+
+            return $row;
+        }, array_values($rows));
+    }
 
     /**
      * @param  array<mixed>  $rows
@@ -22,7 +49,7 @@ final class RepeaterRows
 
         foreach ($rows as $row) {
             if (! is_array($row)) {
-                continue;
+                throw new InvalidArgumentException('A repeater row must be an array.');
             }
 
             $key = $row[self::KEY] ?? null;
@@ -102,7 +129,7 @@ final class RepeaterRows
         $rows = self::withKeys($rows);
         $current = array_column($rows, self::KEY);
 
-        if (! array_is_list($keys) || count($keys) !== count($current) || array_diff($keys, $current) !== [] || count(array_unique($keys)) !== count($keys)) {
+        if (! array_is_list($keys) || count(array_filter($keys, is_string(...))) !== count($keys) || count($keys) !== count($current) || array_diff($keys, $current) !== [] || count(array_unique($keys)) !== count($keys)) {
             return $rows;
         }
 

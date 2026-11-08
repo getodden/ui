@@ -32,6 +32,26 @@ final class RepeaterComponent extends Component
         $this->validate(['items.*.name' => 'required|min:2'], attributes: ['items.*.name' => 'name']);
     }
 
+    public function saveStrictly(): void
+    {
+        $this->validate(['items.*' => 'array:name,_key', 'items.*.name' => 'required']);
+    }
+
+    public function saveWithoutKeyAllowance(): void
+    {
+        $this->validate(['items.*' => 'array:name']);
+    }
+
+    public function loadFromStorage(): void
+    {
+        $this->items = [['name' => 'From storage']];
+    }
+
+    public function resetItems(): void
+    {
+        $this->reset('items');
+    }
+
     public function render(): string
     {
         return <<<'BLADE'
