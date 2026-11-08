@@ -21,7 +21,7 @@ it('moves a row with the buttons and keeps focus on the button that was used', f
         ->click(repeaterRow(1).' [data-repeater-action=down]')
         ->assertScript(repeaterLabels().' === \'["Mobile","Office","Home"]\'')
         ->assertScript('document.activeElement.matches("li:nth-child(2) [data-repeater-action=down]")')
-        ->assertScript('document.querySelector("[role=status][aria-live=polite]").textContent.includes("position 2 of 3")')
+        ->assertScript('document.querySelector("[role=status][aria-live=polite]").textContent === "Phone 1 is now at position 2 of 3"')
         ->click(repeaterRow(2).' [data-repeater-action=down]')
         ->assertScript('document.activeElement.matches("li:nth-child(3) [data-repeater-action=up]")');
 });
@@ -39,7 +39,7 @@ it('keeps typed values with their own rows after a reorder', function (): void {
 it('adds a row and focuses its first field, then removes it and keeps focus in the list', function (): void {
     $page = visit('/');
 
-    $page->click('[data-repeater-add]')
+    $page->click('#repeater-form [data-repeater-add]')
         ->assertScript('document.querySelectorAll("#repeater-form li").length === 4')
         ->assertScript('document.activeElement.closest("li") === document.querySelector("#repeater-form li:nth-child(4)")')
         ->click(repeaterRow(4).' [data-repeater-action=remove]')
@@ -51,10 +51,10 @@ it('adds a row and focuses its first field, then removes it and keeps focus in t
 it('stops adding at the maximum and removing at the minimum', function (): void {
     $page = visit('/');
 
-    $page->click('[data-repeater-add]')
-        ->click('[data-repeater-add]')
+    $page->click('#repeater-form [data-repeater-add]')
+        ->click('#repeater-form [data-repeater-add]')
         ->assertScript('document.querySelectorAll("#repeater-form li").length === 5')
-        ->assertScript('document.querySelector("[data-repeater-add]").disabled');
+        ->assertScript('document.querySelector("#repeater-form [data-repeater-add]").disabled');
 
     $page->click(repeaterRow(5).' [data-repeater-action=remove]')
         ->click(repeaterRow(4).' [data-repeater-action=remove]')
@@ -85,14 +85,33 @@ it('reorders by dragging the handle of a row onto another', function (): void {
 it('announces nothing when the server refused to add a row', function (): void {
     $page = visit('/');
 
-    $page->click('[data-repeater-add]')
-        ->click('[data-repeater-add]')
+    $page->click('#repeater-form [data-repeater-add]')
+        ->click('#repeater-form [data-repeater-add]')
         ->assertScript('document.querySelectorAll("#repeater-form li").length === 5')
         ->wait(0.5)
-        ->script('(() => { const root = document.querySelector("[data-repeater-add]").closest("[x-data]"); document.activeElement.blur(); root._x_dataStack[0].status = ""; root._x_dataStack[0].add() })()');
+        ->script('(() => { const root = document.querySelector("#repeater-form [data-repeater-add]").closest("[x-data]"); document.activeElement.blur(); root._x_dataStack[0].status = ""; root._x_dataStack[0].add() })()');
 
     $page->wait(0.5)
         ->assertScript('document.querySelectorAll("#repeater-form li").length === 5')
-        ->assertScript('document.querySelector("[data-repeater-add]").closest("[x-data]").querySelector("[role=status]").textContent === ""')
+        ->assertScript('document.querySelector("#repeater-form [data-repeater-add]").closest("[x-data]").querySelector("[role=status]").textContent === ""')
         ->assertScript('! document.activeElement.closest("li")');
+});
+
+it('names the row that was dragged, not the one that took its place', function (): void {
+    $page = visit('/');
+
+    $page->script('(() => { const handle = document.querySelector("#repeater-form li:nth-child(1) [draggable=true]"); const target = document.querySelector("#repeater-form li:nth-child(3)"); const transfer = new DataTransfer(); handle.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer })); target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer })); target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })); })()');
+
+    $page->wait(0.5)
+        ->assertScript('document.querySelector("#repeater-form [role=status]").textContent === "Phone 1 is now at position 3 of 3"');
+});
+
+it('puts focus on the add button after the last row is removed', function (): void {
+    $page = visit('/');
+
+    $page->click('#nickname-repeater [data-repeater-action=remove]')
+        ->wait(0.5)
+        ->assertScript('document.querySelectorAll("#nickname-repeater li").length === 0')
+        ->assertScript('document.activeElement === document.querySelector("#nickname-repeater [data-repeater-add]")')
+        ->assertScript('document.querySelector("#nickname-repeater [role=status]").textContent === "Nickname 1 removed"');
 });

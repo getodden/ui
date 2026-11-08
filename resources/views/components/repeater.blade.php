@@ -1,4 +1,4 @@
-@props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'rows' => [], 'min' => 0, 'max' => null, 'itemLabel' => null, 'addLabel' => null])
+@props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'rows' => [], 'itemLabel' => null, 'addLabel' => null])
 
 @php
     throw_if(blank($name), \InvalidArgumentException::class, 'A ui::repeater needs the name of the array property it edits.');
@@ -6,7 +6,8 @@
     $field = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null);
     $rows = array_values($rows);
     $itemLabel = filled($itemLabel) ? $itemLabel : __('ui::ui.repeater.item');
-    $atMaximum = $max !== null && count($rows) >= (int) $max;
+    $spec = isset($this) && method_exists($this, 'repeaterSpec') ? $this->repeaterSpec((string) $name) : null;
+    $atMaximum = $spec?->max !== null && count($rows) >= $spec->max;
 
     $config = [
         'name' => $name,
@@ -38,13 +39,13 @@
     titleOf(row) {
         return row.querySelector('[data-repeater-title]').textContent.trim()
     },
-    announce(template, row) {
+    fill(template, values) {
+        return template.replace(/:(row|position|total)/g, (match, name) => values[name])
+    },
+    announce(template, row, title = this.titleOf(row)) {
         const rows = this.rowElements()
 
-        this.status = template
-            .replace(':row', this.titleOf(row))
-            .replace(':position', rows.indexOf(row) + 1)
-            .replace(':total', rows.length)
+        this.status = this.fill(template, { row: title, position: rows.indexOf(row) + 1, total: rows.length })
     },
     async settle(call) {
         await call
@@ -71,7 +72,7 @@
             return
         }
 
-        this.status = config.messages.removed.replace(':row', title)
+        this.status = this.fill(config.messages.removed, { row: title })
 
         const rows = this.rowElements()
         const next = rows[Math.min(position, rows.length - 1)]
@@ -84,6 +85,7 @@
     },
     async move(key, direction) {
         const before = this.rowKeys().join()
+        const title = this.titleOf(this.rowElement(key))
 
         await this.settle(this.$wire.moveRepeaterRow(config.name, key, direction))
 
@@ -93,7 +95,7 @@
 
         const row = this.rowElement(key)
 
-        this.announce(config.messages.moved, row)
+        this.announce(config.messages.moved, row, title)
 
         const preferred = row.querySelector('[data-repeater-action=' + direction + ']:not([disabled])')
         const fallback = row.querySelector('[data-repeater-action]:not([disabled])')
@@ -125,6 +127,8 @@
             return
         }
 
+        const title = this.titleOf(this.rowElement(dragged))
+
         keys.splice(to, 0, keys.splice(from, 1)[0])
 
         await this.settle(this.$wire.reorderRepeaterRows(config.name, keys))
@@ -133,7 +137,7 @@
             return
         }
 
-        this.announce(config.messages.moved, this.rowElement(dragged))
+        this.announce(config.messages.moved, this.rowElement(dragged), title)
     },
 })
 JS;

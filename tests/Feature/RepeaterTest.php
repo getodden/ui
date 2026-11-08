@@ -175,14 +175,9 @@ it('shows each row error beside its own field and keeps keys after a reorder', f
 });
 
 it('renders an accessible list of labelled rows', function (): void {
-    $rows = RepeaterRows::withKeys([['name' => 'a'], ['name' => 'b']]);
-    $dom = Html::render(<<<'BLADE'
-        <x-ui::repeater label="People" name="items" :rows="$rows" :min="2" :max="3" item-label="Person" hint="Add everyone">
-            @foreach ($rows as $index => $row)
-                <x-ui::repeater.row :index="$index"><span>content {{ $index }}</span></x-ui::repeater.row>
-            @endforeach
-        </x-ui::repeater>
-    BLADE, ['rows' => $rows]);
+    $component = Livewire::test(RepeaterComponent::class)->set('items', [['name' => 'a'], ['name' => 'b']]);
+    $rows = $component->get('items');
+    $dom = Html::render($component->html());
 
     $group = $dom->querySelector('[x-data]');
     $items = $dom->querySelectorAll('ol > li');
@@ -190,7 +185,6 @@ it('renders an accessible list of labelled rows', function (): void {
 
     expect($group->getAttribute('role'))->toBe('group')
         ->and($group->getAttribute('aria-labelledby'))->toBe('ui-items-label')
-        ->and($group->getAttribute('aria-describedby'))->toBe('ui-items-hint')
         ->and($dom->getElementById('ui-items-label')->textContent)->toBe('People')
         ->and($items)->toHaveCount(2)
         ->and($items[0]->getAttribute('data-repeater-key'))->toBe($rows[0]['_key'])
@@ -199,14 +193,14 @@ it('renders an accessible list of labelled rows', function (): void {
         ->and($items[0]->querySelector('[data-repeater-action=up]')->hasAttribute('disabled'))->toBeTrue()
         ->and($items[0]->querySelector('[data-repeater-action=down]')->hasAttribute('disabled'))->toBeFalse()
         ->and($items[1]->querySelector('[data-repeater-action=down]')->hasAttribute('disabled'))->toBeTrue()
-        ->and($items[0]->querySelector('[data-repeater-action=remove]')->hasAttribute('disabled'))->toBeTrue()
+        ->and($items[0]->querySelector('[data-repeater-action=remove]')->hasAttribute('disabled'))->toBeFalse()
         ->and($items[0]->querySelector('[data-repeater-action=up]')->getAttribute('aria-label'))->toBe('Move Person 1 up')
         ->and($items[1]->querySelector('[data-repeater-action=remove]')->getAttribute('aria-label'))->toBe('Remove Person 2')
         ->and($dom->querySelector('[role=status][aria-live=polite]'))->not->toBeNull();
 });
 
 it('disables adding at the maximum and says when there are no rows', function (): void {
-    $full = Html::render('<x-ui::repeater label="People" name="items" :rows="[[\'_key\' => \'a\']]" :max="1" />');
+    $full = Html::render(Livewire::test(RepeaterComponent::class)->set('items', array_fill(0, 4, ['name' => 'x']))->html());
     $empty = Html::render('<x-ui::repeater label="People" name="items" :rows="[]" add-label="Add person" />');
 
     expect($full->querySelector('[data-repeater-add]')->hasAttribute('disabled'))->toBeTrue()
@@ -291,4 +285,39 @@ it('ignores a reorder holding something other than keys', function (): void {
     $component->call('reorderRepeaterRows', 'items', [['x'], 'k', 'j']);
 
     expect($component->get('items'))->toBe($before);
+});
+
+it('takes the minimum and maximum from the spec, not from the markup', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->set('items', [['name' => 'only']]);
+    $one = Html::render($component->html());
+
+    $component->set('items', array_fill(0, 4, ['name' => 'x']));
+    $four = Html::render($component->html());
+
+    expect($one->querySelector('[data-repeater-action=remove]')->hasAttribute('disabled'))->toBeTrue()
+        ->and($one->querySelector('[data-repeater-add]')->hasAttribute('disabled'))->toBeFalse()
+        ->and($four->querySelector('[data-repeater-action=remove]')->hasAttribute('disabled'))->toBeFalse()
+        ->and($four->querySelector('[data-repeater-add]')->hasAttribute('disabled'))->toBeTrue();
+});
+
+it('cuts a property set from the browser to the maximum and pads it to the minimum', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->set('items', array_fill(0, 10, ['name' => 'x']));
+
+    expect($component->get('items'))->toHaveCount(4);
+
+    $component->set('items', []);
+
+    expect($component->get('items'))->toHaveCount(1)
+        ->and($component->get('items')[0]['name'])->toBe('')
+        ->and($component->get('items')[0]['_key'])->not->toBe('');
+});
+
+it('cuts a row update that grows the property past the maximum', function (): void {
+    $component = Livewire::test(RepeaterComponent::class)->set('items.7', ['name' => 'x']);
+
+    expect($component->get('items'))->toHaveCount(4);
+});
+
+it('answers a render hook called from the browser without failing', function (): void {
+    Livewire::test(RepeaterComponent::class)->call('renderingWithRepeater')->assertOk();
 });
