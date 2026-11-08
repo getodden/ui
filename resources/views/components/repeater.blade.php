@@ -29,6 +29,9 @@
     rowElements() {
         return [...this.root.querySelectorAll('[data-repeater-key]')]
     },
+    rowKeys() {
+        return this.rowElements().map((row) => row.dataset.repeaterKey)
+    },
     rowElement(key) {
         return this.rowElements().find((row) => row.dataset.repeaterKey === key)
     },
@@ -48,9 +51,11 @@
         await this.$nextTick()
     },
     async add() {
+        const before = this.rowKeys()
+
         await this.settle(this.$wire.addRepeaterRow(config.name))
 
-        const row = this.rowElements().at(-1)
+        const row = this.rowElements().find((candidate) => ! before.includes(candidate.dataset.repeaterKey))
 
         if (row) {
             this.announce(config.messages.added, row)
@@ -61,6 +66,10 @@
         const title = this.titleOf(this.rowElement(key))
 
         await this.settle(this.$wire.removeRepeaterRow(config.name, key))
+
+        if (this.rowElement(key)) {
+            return
+        }
 
         this.status = config.messages.removed.replace(':row', title)
 
@@ -74,7 +83,13 @@
         }
     },
     async move(key, direction) {
+        const before = this.rowKeys().join()
+
         await this.settle(this.$wire.moveRepeaterRow(config.name, key, direction))
+
+        if (this.rowKeys().join() === before) {
+            return
+        }
 
         const row = this.rowElement(key)
 
@@ -101,7 +116,8 @@
 
         this.dragging = null
 
-        const keys = this.rowElements().map((row) => row.dataset.repeaterKey)
+        const keys = this.rowKeys()
+        const before = keys.join()
         const from = keys.indexOf(dragged)
         const to = keys.indexOf(targetKey)
 
@@ -112,6 +128,10 @@
         keys.splice(to, 0, keys.splice(from, 1)[0])
 
         await this.settle(this.$wire.reorderRepeaterRows(config.name, keys))
+
+        if (this.rowKeys().join() === before) {
+            return
+        }
 
         this.announce(config.messages.moved, this.rowElement(dragged))
     },

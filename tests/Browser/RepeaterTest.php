@@ -81,3 +81,18 @@ it('reorders by dragging the handle of a row onto another', function (): void {
 
     $page->assertScript(repeaterLabels().' === \'["Mobile","Home","Office"]\'');
 });
+
+it('announces nothing when the server refused to add a row', function (): void {
+    $page = visit('/');
+
+    $page->click('[data-repeater-add]')
+        ->click('[data-repeater-add]')
+        ->assertScript('document.querySelectorAll("#repeater-form li").length === 5')
+        ->wait(0.5)
+        ->script('(() => { const root = document.querySelector("[data-repeater-add]").closest("[x-data]"); document.activeElement.blur(); root._x_dataStack[0].status = ""; root._x_dataStack[0].add() })()');
+
+    $page->wait(0.5)
+        ->assertScript('document.querySelectorAll("#repeater-form li").length === 5')
+        ->assertScript('document.querySelector("[data-repeater-add]").closest("[x-data]").querySelector("[role=status]").textContent === ""')
+        ->assertScript('! document.activeElement.closest("li")');
+});
