@@ -1,6 +1,6 @@
 @props(['index', 'title' => null])
 
-@aware(['name', 'id' => null, 'rows' => [], 'itemLabel' => null])
+@aware(['name', 'rows' => [], 'itemLabel' => null])
 
 @php
     $rows = array_values($rows);
@@ -15,7 +15,7 @@
 
     $itemLabel = filled($itemLabel) ? $itemLabel : __('ui::ui.repeater.item');
     $title = filled($title) ? $title : __('ui::ui.repeater.title', ['item' => $itemLabel, 'number' => $index + 1]);
-    $titleId = (filled($id) ? $id : \Odden\Ui\Support\FieldState::idFromName($name)).'-row-'.$index.'-title';
+    $titleId = \Odden\Ui\Support\FieldState::idFromName($name).'-row-'.$index.'-title';
     $keyScript = \Illuminate\Support\Js::from($key);
     $canRemove = count($rows) > ($spec?->min ?? 0);
     $rowErrors = ($errors ?? null) instanceof \Illuminate\Support\ViewErrorBag ? $errors->getBag('default') : null;

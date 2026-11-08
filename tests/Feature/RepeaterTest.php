@@ -356,7 +356,7 @@ it('refuses a repeater whose property is not registered', function (): void {
 it('scopes the row ids to the repeater id', function (): void {
     $dom = Html::render('<x-ui::repeater label="L" name="items" id="first" :rows="$rows"><x-ui::repeater.row :index="0">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => RepeaterRows::withKeys([['name' => 'a']])]);
 
-    expect($dom->getElementById('first-row-0-title'))->not->toBeNull();
+    expect($dom->getElementById('ui-items-row-0-title'))->not->toBeNull();
 });
 
 it('orders the row title through the translation', function (): void {
@@ -388,7 +388,31 @@ it('refuses a spec whose limits contradict each other', function (int $min, ?int
 })->with([[3, 2], [-1, null], [0, -1]])->throws(InvalidArgumentException::class);
 
 it('titles a row by the title it is given', function (): void {
-    $dom = Html::render('<x-ui::repeater label="L" name="items" id="first" :rows="$rows"><x-ui::repeater.row :index="0" title="Mobile">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => RepeaterRows::withKeys([['name' => 'a']])]);
+    $dom = Html::render('<x-ui::repeater label="L" name="items" :rows="$rows"><x-ui::repeater.row :index="0" title="Mobile">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => RepeaterRows::withKeys([['name' => 'a']])]);
 
-    expect($dom->getElementById('first-row-0-title')->textContent)->toBe('Mobile');
+    expect($dom->getElementById('ui-items-row-0-title')->textContent)->toBe('Mobile');
+});
+
+it('keeps row ids apart for two repeaters under a wrapper that has an id', function (): void {
+    $row = '<x-ui::repeater.row :index="0">x</x-ui::repeater.row>';
+    $dom = Html::render('<x-ui::card id="contact"><x-ui::repeater label="Phones" name="phones" :rows="$rows">'.$row.'</x-ui::repeater><x-ui::repeater label="Emails" name="emails" :rows="$rows">'.$row.'</x-ui::repeater></x-ui::card>', ['rows' => [['_key' => 'k']]]);
+
+    expect($dom->getElementById('ui-phones-row-0-title'))->not->toBeNull()
+        ->and($dom->getElementById('ui-emails-row-0-title'))->not->toBeNull()
+        ->and($dom->getElementById('contact-row-0-title'))->toBeNull();
+});
+
+it('leaves out the label element and aria-labelledby when only an aria-label names the group', function (): void {
+    $dom = Html::render('<x-ui::repeater aria-label="Phones" name="phones" :rows="[]" />');
+    $group = $dom->querySelector('[role=group]');
+
+    expect($group->getAttribute('aria-label'))->toBe('Phones')
+        ->and($group->hasAttribute('aria-labelledby'))->toBeFalse()
+        ->and($dom->getElementById('ui-phones-label'))->toBeNull();
+});
+
+it('marks the row list as a list for browsers that drop list semantics', function (): void {
+    $dom = Html::render('<x-ui::repeater label="People" name="items" :rows="$rows"><x-ui::repeater.row :index="0">x</x-ui::repeater.row></x-ui::repeater>', ['rows' => [['_key' => 'k']]]);
+
+    expect($dom->querySelector('ol')->getAttribute('role'))->toBe('list');
 });

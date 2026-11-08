@@ -155,11 +155,13 @@ JS;
 
 <div {{ $attributes->except('aria-describedby')->merge(array_filter([
     'role' => 'group',
-    'aria-labelledby' => $field->id.'-label',
+    'aria-labelledby' => filled($label) ? $field->id.'-label' : null,
     'aria-describedby' => $field->describedBy,
     'x-data' => '('.$script.')('.\Illuminate\Support\Js::from($config).')',
 ], fn ($value) => $value !== null))->class('space-y-3') }}>
-    <p id="{{ $field->id }}-label" class="block text-sm font-medium text-gray-900 dark:text-gray-100">{{ $label }}</p>
+    @if (filled($label))
+        <p id="{{ $field->id }}-label" class="block text-sm font-medium text-gray-900 dark:text-gray-100">{{ $label }}</p>
+    @endif
 
     @if (filled($hint))
         <p id="{{ $field->id }}-hint" class="text-sm text-gray-500 dark:text-gray-400">{{ $hint }}</p>
@@ -168,7 +170,7 @@ JS;
     @if ($rows === [])
         <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('ui::ui.repeater.empty') }}</p>
     @else
-        <ol class="space-y-3">
+        <ol role="list" class="space-y-3">
             {{ $slot }}
         </ol>
     @endif
