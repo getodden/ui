@@ -71,4 +71,16 @@ return [
         'favourable' => 'Favourable',
         'unfavourable' => 'Unfavourable',
     ],
+    'repeater' => [
+        'item' => 'Item',
+        'title' => ':item :number',
+        'add' => 'Add item',
+        'empty' => 'Nothing added yet.',
+        'move_up' => 'Move :row up',
+        'move_down' => 'Move :row down',
+        'remove' => 'Remove :row',
+        'added' => ':row added',
+        'removed' => ':row removed',
+        'moved' => ':row is now at position :position of :total',
+    ],
 ];
