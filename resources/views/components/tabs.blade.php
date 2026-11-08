@@ -10,7 +10,24 @@
     $panelId = fn (string $key): string => $id.'-panel-'.substr(sha1($key), 0, 10);
 @endphp
 
-<div id="{{ $id }}" x-data="{ selected: '', init() { this.selected = this.$root.dataset.initial } }" x-modelable="selected" data-initial="{{ $initial }}" {{ $attributes->whereDoesntStartWith('aria-')->whereDoesntStartWith('wire:model') }} {{ $attributes->whereStartsWith('wire:model') }}>
+<div id="{{ $id }}" x-data="{
+        selected: '',
+        init() {
+            this.selected = this.$root.dataset.initial
+            this.$watch('selected', () => this.normalize())
+            this.$nextTick(() => {
+                this.normalize()
+                new MutationObserver(() => this.normalize()).observe(this.$root, { childList: true, subtree: true })
+            })
+        },
+        normalize() {
+            const keys = [...this.$root.querySelectorAll('[role=tab]')].map((tab) => tab.dataset.key)
+            if (keys.length === 0) return
+            const current = String(this.selected ?? '')
+            const next = keys.includes(current) ? current : keys[0]
+            if (this.selected !== next) this.selected = next
+        }
+    }" x-modelable="selected" data-initial="{{ $initial }}" {{ $attributes->whereDoesntStartWith('aria-')->whereDoesntStartWith('wire:model') }} {{ $attributes->whereStartsWith('wire:model') }}>
     <div
         role="tablist"
         @if (filled($label)) aria-label="{{ $label }}" @endif
