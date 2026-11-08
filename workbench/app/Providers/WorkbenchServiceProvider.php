@@ -11,8 +11,8 @@ use Workbench\App\ImportMap;
 use Workbench\App\Livewire\BoardDemo;
 use Workbench\App\Livewire\Demo;
 use Workbench\App\Livewire\EditorDemo;
-use Workbench\App\Livewire\RepeaterDemo;
 use Workbench\App\Livewire\FormsDemo;
+use Workbench\App\Livewire\RepeaterDemo;
 use Workbench\App\Livewire\TableDemo;
 
 final class WorkbenchServiceProvider extends ServiceProvider
