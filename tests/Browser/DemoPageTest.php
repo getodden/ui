@@ -164,7 +164,7 @@ it('puts a confirmation declared earlier in the DOM on top of the modal that ope
         ->click('#delete-in-modal')
         ->assertSee('Delete this item?');
 
-    $page->assertScript('(() => { const dialog = document.querySelector("[role=dialog]:has(button[data-autofocus])"); const box = dialog.querySelector("h2").getBoundingClientRect(); const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return dialog.contains(top) })()')
+    $page->assertScript('(() => { const dialog = [...document.querySelectorAll("[role=dialog]:has(button[data-autofocus])")].find(candidate => getComputedStyle(candidate).display !== "none"); const box = dialog.querySelector("h2").getBoundingClientRect(); const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2); return dialog.contains(top) })()')
         ->assertScript('document.activeElement.textContent.trim() === "Cancel"');
 });
 
