@@ -12,7 +12,7 @@
     {{ $attributes->class(['flex w-72 shrink-0 flex-col rounded-surface border border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100']) }}
 >
     <header class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-        <h3 id="{{ $headingId }}" class="min-w-0 truncate text-sm font-semibold">{{ $label }}</h3>
+        <h3 id="{{ $headingId }}" data-board-heading tabindex="-1" class="min-w-0 truncate text-sm font-semibold">{{ $label }}</h3>
         <div class="flex items-center gap-2">
             @if (filled($total))
                 <span class="text-xs text-gray-500 dark:text-gray-400" data-board-total>{{ $total }}</span>

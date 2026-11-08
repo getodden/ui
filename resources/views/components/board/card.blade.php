@@ -15,16 +15,20 @@
 >
     <div>{{ $slot }}</div>
 
-    <select
-        data-board-move
-        aria-label="{{ __('ui::ui.board.move_card', ['card' => $label]) }}"
-        x-bind:disabled="pending"
-        class="mt-2 block w-full rounded-control border border-gray-400 bg-white px-2 py-1 text-xs text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-500 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400"
-    >
-        <option value="" selected>{{ __('ui::ui.board.move_to') }}</option>
-        @foreach ($columns as $key => $columnLabel)
-            @continue((string) $key === $current)
-            <option value="{{ $key }}">{{ $columnLabel }}</option>
-        @endforeach
-    </select>
+    <div class="mt-2 flex items-center gap-1">
+        <select
+            data-board-move
+            aria-label="{{ __('ui::ui.board.move_card', ['card' => $label]) }}"
+            x-bind:disabled="pending"
+            class="block min-w-0 flex-1 rounded-control border border-gray-400 bg-white px-2 py-1 text-xs text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-500 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400"
+        >
+            <option value="" selected>{{ __('ui::ui.board.move_to') }}</option>
+            @foreach ($columns as $key => $columnLabel)
+                @continue((string) $key === $current)
+                <option value="{{ $key }}">{{ $columnLabel }}</option>
+            @endforeach
+        </select>
+        <x-ui::button type="button" variant="outline" size="sm" data-board-shift="-1" aria-label="{{ __('ui::ui.board.move_up', ['card' => $label]) }}" x-bind:disabled="pending"><span aria-hidden="true">&uarr;</span></x-ui::button>
+        <x-ui::button type="button" variant="outline" size="sm" data-board-shift="1" aria-label="{{ __('ui::ui.board.move_down', ['card' => $label]) }}" x-bind:disabled="pending"><span aria-hidden="true">&darr;</span></x-ui::button>
+    </div>
 </li>

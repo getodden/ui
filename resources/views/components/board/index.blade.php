@@ -9,6 +9,7 @@
 
     $messages = [
         'moved' => __('ui::ui.board.moved'),
+        'movedElsewhere' => __('ui::ui.board.moved_elsewhere'),
         'refused' => __('ui::ui.board.refused'),
         'failed' => __('ui::ui.board.failed'),
     ];
@@ -22,9 +23,17 @@
         dragging: null,
         over: null,
         message: '',
+        sayTimer: null,
         messages: @js($messages),
         say(key, values) {
-            this.message = this.messages[key].replace(/:(\w+)/g, (match, name) => values[name] ?? match)
+            const text = this.messages[key].replace(/:(\w+)/g, (match, name) => values[name] ?? match)
+            clearTimeout(this.sayTimer)
+            this.message = ''
+            this.sayTimer = setTimeout(() => (this.message = text), 50)
+        },
+        controlLike(card, like) {
+            if (!like.hasAttribute('data-board-shift')) return card.querySelector('[data-board-move]')
+            return [...card.querySelectorAll('[data-board-shift]')].find((button) => button.dataset.boardShift === like.dataset.boardShift) ?? null
         },
         cardElement(id) {
             return [...this.$el.querySelectorAll('[data-board-card]')].find((card) => card.dataset.boardCard === id) ?? null
@@ -91,6 +100,13 @@
             if (!list) return
             this.move(card, key, this.cardsIn(list).filter((other) => other !== card).length)
         },
+        shift(event) {
+            const button = event.target.closest?.('[data-board-shift]')
+            const card = button?.closest('[data-board-card]')
+            if (!card || !button) return
+            const list = card.parentElement
+            this.move(card, list.dataset.boardList, this.cardsIn(list).indexOf(card) + parseInt(button.dataset.boardShift, 10))
+        },
         async move(card, key, position) {
             const target = this.listElement(key)
             const source = card.parentElement
@@ -100,7 +116,7 @@
             if (source === target && this.cardsIn(source).indexOf(card) === toIndex) return
             const next = card.nextElementSibling
             const focused = card.contains(document.activeElement) ? document.activeElement : null
-            const values = { card: card.dataset.boardLabel, column: this.columnLabel(target), position: toIndex + 1, total: rest.length + 1 }
+            const values = { id: card.dataset.boardCard, card: card.dataset.boardLabel, column: this.columnLabel(target), position: toIndex + 1, total: rest.length + 1 }
             const origin = this.columnLabel(source)
             this.pending = true
             target.insertBefore(card, rest[toIndex] ?? null)
@@ -116,7 +132,14 @@
                 outcome = 'failed'
             }
             if (outcome === 'moved') {
-                this.say('moved', values)
+                await this.$nextTick()
+                const placed = this.cardElement(values.id)
+                if (placed) {
+                    const shown = this.cardsIn(placed.parentElement)
+                    this.say('moved', { card: values.card, column: this.columnLabel(placed.parentElement), position: shown.indexOf(placed) + 1, total: shown.length })
+                } else {
+                    this.say('movedElsewhere', { card: values.card, column: values.column })
+                }
             } else {
                 if (card.isConnected && card.parentElement === target && source !== target) {
                     this.adjustCount(source, 1)
@@ -128,8 +151,12 @@
                 this.say(outcome, { card: values.card, column: origin })
             }
             this.pending = false
+            await this.$nextTick()
             if (focused && document.activeElement !== focused) {
-                this.$nextTick(() => (focused.isConnected ? focused : this.cardElement(card.dataset.boardCard)?.querySelector('[data-board-move]'))?.focus())
+                const placed = this.cardElement(values.id)
+                const heading = this.listElement(key)?.closest('[data-board-column]').querySelector('[data-board-heading]')
+                const landing = focused.isConnected ? focused : ((placed ? this.controlLike(placed, focused) : null) ?? heading)
+                landing?.focus()
             }
         },
     }"
@@ -138,6 +165,7 @@
     x-on:drop="drop($event)"
     x-on:dragend="dragEnd()"
     x-on:change="select($event)"
+    x-on:click="shift($event)"
     x-bind:aria-busy="pending ? 'true' : null"
     {{ $attributes->class(['flex items-start gap-4 overflow-x-auto pb-2']) }}
 >

@@ -31,7 +31,15 @@ final class BoardDemo extends Component
             return false;
         }
 
-        return Fruit::query()->whereKey($cardId)->whereIn('colour', array_keys(self::COLUMNS))->update(['colour' => $toColumn]) > 0;
+        $fruit = Fruit::query()->whereKey($cardId)->whereIn('colour', array_keys(self::COLUMNS))->first();
+
+        if ($fruit === null) {
+            return false;
+        }
+
+        $fruit->update(['colour' => $toColumn]);
+
+        return true;
     }
 
     public function render(): View

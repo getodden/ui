@@ -122,7 +122,15 @@ class Deals extends Component
 
     protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
     {
-        return Deal::query()->whereKey($cardId)->update(['stage' => $toColumn]) > 0;
+        $deal = Deal::query()->find($cardId);
+
+        if ($deal === null) {
+            return false;
+        }
+
+        $this->authorize('update', $deal);
+
+        return $deal->update(['stage' => $toColumn]);
     }
 
     protected function boardPageSize(): int
@@ -132,11 +140,11 @@ class Deals extends Component
 }
 ```
 
-A card moves by dragging it, or with the Move to select on the card, which works with the keyboard and on touch screens. The page moves the card at once and calls `moveBoardCard()`. Return `false`, or throw an `AuthorizationException`, to refuse the move: the card goes back and the status region says so. A request that fails does the same.
+A card moves by dragging it, or with the controls on the card, which work with the keyboard and on touch screens: the Move to select sends it to the end of another column, and the up and down buttons move it one place within its column. The page moves the card at once and calls `moveBoardCard()`. When the server answers, the status region announces the position the card has in the list you rendered, and focus goes to the card's control, or to the column heading if your query no longer shows the card. Return `false`, or throw an `AuthorizationException`, to refuse the move: the card goes back and the status region says so. A request that fails does the same.
 
-The card id arrives from the browser as a string and is not trusted: look the card up through your tenant or policy scope. The column is checked against `boardColumnKeys()` and the position is a non-negative integer, counted among the cards currently shown in that column (the select appends to the end). The write method is never called for anything that fails those checks.
+The card id arrives from the browser as a string and is not trusted: look the card up through your tenant or policy scope. The column is checked against `boardColumnKeys()` and the position is a non-negative integer, counted among the cards currently shown in that column (the select appends to the end, the buttons shift by one). The write method is never called for anything that fails those checks.
 
-`boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, which raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
+`boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, a read: if your component classifies public methods as reads or writes, list it as a read. It raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
 
 ### Table
 

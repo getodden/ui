@@ -73,3 +73,22 @@ it('has a live region for announcing moves', function (): void {
     expect($region->getAttribute('aria-live'))->toBe('polite')
         ->and($region->classList->contains('sr-only'))->toBeTrue();
 });
+
+it('renders up and down buttons and a focusable heading for the keyboard', function (): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha']">
+        <x-ui::board.column column="a" label="Alpha" :count="1">
+            <x-ui::board.card id="9" label="Nine">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE);
+
+    $buttons = $dom->querySelectorAll('[data-board-card] button[data-board-shift]');
+
+    expect($buttons)->toHaveCount(2)
+        ->and($buttons[0]->getAttribute('data-board-shift'))->toBe('-1')
+        ->and($buttons[0]->getAttribute('aria-label'))->toBe('Move Nine up')
+        ->and($buttons[1]->getAttribute('data-board-shift'))->toBe('1')
+        ->and($buttons[1]->getAttribute('aria-label'))->toBe('Move Nine down')
+        ->and($dom->querySelector('h3[data-board-heading]')->getAttribute('tabindex'))->toBe('-1');
+});
