@@ -10,6 +10,7 @@ use Odden\Ui\Support\RecordTableReads;
 use Odden\Ui\Tests\Support\BulkRecordTableComponent;
 use Odden\Ui\Tests\Support\Html;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
+use Odden\Ui\Tests\Support\WideRecordTableComponent;
 use Workbench\App\Models\Fruit;
 
 beforeEach(function (): void {
@@ -181,7 +182,7 @@ it('shows the bulk bar only while rows are selected', function (): void {
 
     expect($none->querySelector('[role=group]'))->toBeNull()
         ->and($group)->not->toBeNull()
-        ->and($group->querySelectorAll('button'))->toHaveCount(3)
+        ->and($group->querySelectorAll('button'))->toHaveCount(4)
         ->and($group->textContent)->toContain('Record');
 });
 
@@ -224,4 +225,62 @@ it('lists only methods that exist on the trait as pure reads and never the bulk 
 
     expect(RecordTableReads::METHODS)->not->toContain('runBulkAction')
         ->and((new ReflectionMethod(WithRecordTable::class, 'runBulkAction'))->isPublic())->toBeTrue();
+});
+
+it('keeps the selection while a bulk action waits for confirmation and clears it once confirmed', function (): void {
+    $ids = fruitIds('Apple', 'Apricot');
+    $component = Livewire::test(BulkRecordTableComponent::class)->set('selected', $ids)->call('runBulkAction', 'askToRemove');
+
+    expect($component->get('confirming'))->toBeTrue()
+        ->and($component->get('selected'))->toBe($ids);
+
+    $component->call('cancelConfirmation');
+
+    expect($component->get('selected'))->toBe($ids);
+
+    $component->call('runBulkAction', 'askToRemove')->call('runConfirmation');
+
+    expect($component->get('received'))->toBe($ids)
+        ->and($component->get('selected'))->toBe([]);
+});
+
+it('refuses to run a bulk action that is public', function (): void {
+    $component = Livewire::test(WideRecordTableComponent::class)->set('selected', ['1']);
+
+    expect(fn () => $component->call('runBulkAction', 'exposedSelection'))->toThrow(LogicException::class);
+    expect($component->get('received'))->toBe([]);
+});
+
+it('does not cut a full page selection when the page size is above the default cap', function (): void {
+    $keys = array_map(strval(...), range(1, 250));
+    $component = Livewire::test(WideRecordTableComponent::class)->set('selected', $keys);
+
+    expect($component->get('selected'))->toBe($keys);
+});
+
+it('reads the tabs no more than twice per render', function (): void {
+    $component = Livewire::test(BulkRecordTableComponent::class);
+
+    expect($component->get('tabReads'))->toBeLessThanOrEqual(2);
+});
+
+it('gives names with special characters a clean accessible name', function (): void {
+    $name = "Tom & Jerry's <b>";
+    $dom = Html::render('<x-ui::table.select value="1" :label="\'Select \'.$name" /><x-ui::table.actions :label="\'Actions for \'.$name">x</x-ui::table.actions>', ['name' => $name]);
+
+    expect($dom->querySelector('input')->getAttribute('aria-label'))->toBe('Select '.$name)
+        ->and($dom->querySelector('button[aria-haspopup=menu]')->getAttribute('aria-label'))->toBe('Actions for '.$name);
+});
+
+it('accepts a collection of selectable keys', function (): void {
+    $dom = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[]" :selectable-keys="collect([1, 2])" />');
+
+    expect(json_decode($dom->querySelector('thead input[type=checkbox]')->getAttribute('data-keys'), true))->toBe(['1', '2']);
+});
+
+it('lets the bulk buttons restore focus to the page checkbox once the bar disappears', function (): void {
+    $dom = Html::parse(Livewire::test(BulkRecordTableComponent::class)->set('selected', fruitIds('Apple'))->html());
+
+    expect($dom->querySelector('thead input[type=checkbox]')->getAttribute('x-ref'))->toBe('selectPage')
+        ->and($dom->querySelector('[role=group] button')->getAttribute('x-on:click'))->toContain('restoreFocus');
 });

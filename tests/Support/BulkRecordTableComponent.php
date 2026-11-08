@@ -9,11 +9,13 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Blade;
 use InvalidArgumentException;
 use Livewire\Component;
+use Odden\Ui\Livewire\Concerns\WithConfirmation;
 use Odden\Ui\Livewire\Concerns\WithRecordTable;
 use Workbench\App\Models\Fruit;
 
 class BulkRecordTableComponent extends Component
 {
+    use WithConfirmation;
     use WithRecordTable;
 
     /**
@@ -22,6 +24,8 @@ class BulkRecordTableComponent extends Component
     public array $received = [];
 
     public int $maximum = 100;
+
+    public int $tabReads = 0;
 
     /**
      * @return array<string, string>
@@ -46,6 +50,8 @@ class BulkRecordTableComponent extends Component
      */
     protected function recordTabs(): array
     {
+        $this->tabReads++;
+
         return [
             'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query],
             'red' => ['label' => 'Red', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('colour', 'red')],
@@ -58,7 +64,7 @@ class BulkRecordTableComponent extends Component
      */
     protected function bulkActions(): array
     {
-        return ['recordSelection' => 'Record', 'refuseSelection' => 'Refuse'];
+        return ['recordSelection' => 'Record', 'refuseSelection' => 'Refuse', 'askToRemove' => 'Remove'];
     }
 
     /**
@@ -75,6 +81,23 @@ class BulkRecordTableComponent extends Component
     protected function refuseSelection(array $keys): void
     {
         throw new InvalidArgumentException('refused');
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function askToRemove(array $keys): void
+    {
+        $this->confirm('removeSelection', [$keys], 'Remove?', 'Sure?', 'Remove');
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function removeSelection(array $keys): void
+    {
+        $this->received = $keys;
+        $this->clearSelection();
     }
 
     public function unlistedAction(): void
@@ -98,10 +121,10 @@ class BulkRecordTableComponent extends Component
             <x-ui::table caption="Fruit" :state="$state" :records="$records" :columns="['name' => 'Name']" :selectable-keys="$records->pluck('id')->all()" row-actions>
                 @foreach ($records as $fruit)
                     <tr wire:key="fruit-{{ $fruit->id }}">
-                        <td><x-ui::table.select :value="$fruit->id" label="Select {{ $fruit->name }}" /></td>
+                        <td><x-ui::table.select :value="$fruit->id" :label="'Select '.$fruit->name" /></td>
                         <th scope="row">{{ $fruit->name }}</th>
                         <td>
-                            <x-ui::table.actions label="Actions for {{ $fruit->name }}">
+                            <x-ui::table.actions :label="'Actions for '.$fruit->name">
                                 <x-ui::table.action wire:click="unlistedAction">Open</x-ui::table.action>
                                 <x-ui::table.action danger>Remove</x-ui::table.action>
                             </x-ui::table.actions>

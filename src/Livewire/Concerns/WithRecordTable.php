@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
+use LogicException;
 use Odden\Ui\Support\RecordTableState;
+use ReflectionMethod;
 
 trait WithRecordTable
 {
@@ -77,9 +79,7 @@ trait WithRecordTable
 
     protected function defaultTab(): ?string
     {
-        $first = array_key_first($this->recordTabs());
-
-        return $first === null ? null : (string) $first;
+        return null;
     }
 
     /**
@@ -92,7 +92,7 @@ trait WithRecordTable
 
     protected function maximumSelection(): int
     {
-        return 100;
+        return max([100, ...$this->perPageOptions()]);
     }
 
     /**
@@ -156,7 +156,7 @@ trait WithRecordTable
             return;
         }
 
-        $this->tab = $key === $this->defaultTab() ? '' : $key;
+        $this->tab = $key === $this->resolveDefaultTab($tabs) ? '' : $key;
         $this->resetPage();
     }
 
@@ -171,6 +171,10 @@ trait WithRecordTable
             return;
         }
 
+        if ((new ReflectionMethod($this, $action))->isPublic()) {
+            throw new LogicException("Bulk action [{$action}] must be protected.");
+        }
+
         $keys = $this->selectedKeys();
 
         if ($keys === []) {
@@ -178,17 +182,27 @@ trait WithRecordTable
         }
 
         $this->{$action}($keys);
-        $this->clearSelection();
+
+        if (! $this->awaitingConfirmation()) {
+            $this->clearSelection();
+        }
+    }
+
+    private function awaitingConfirmation(): bool
+    {
+        return property_exists($this, 'confirming') && $this->confirming === true;
     }
 
     protected function recordTableState(): RecordTableState
     {
+        $tabs = $this->recordTabs();
+
         return new RecordTableState(
             array_map(strval(...), array_keys($this->sortableColumns())),
             $this->activeSort(),
             $this->activeDirection(),
-            array_map(fn (array $tab): string => $tab['label'], $this->recordTabs()),
-            $this->activeTab(),
+            array_map(fn (array $tab): string => $tab['label'], $tabs),
+            $this->activeTabIn($tabs),
             count($this->selectedKeys()),
             $this->bulkActions(),
         );
@@ -196,8 +210,14 @@ trait WithRecordTable
 
     protected function activeTab(): ?string
     {
-        $tabs = $this->recordTabs();
+        return $this->activeTabIn($this->recordTabs());
+    }
 
+    /**
+     * @param  array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>  $tabs
+     */
+    private function activeTabIn(array $tabs): ?string
+    {
         if ($tabs === []) {
             return null;
         }
@@ -208,9 +228,23 @@ trait WithRecordTable
             return $requested;
         }
 
+        return $this->resolveDefaultTab($tabs);
+    }
+
+    /**
+     * @param  array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>  $tabs
+     */
+    private function resolveDefaultTab(array $tabs): ?string
+    {
         $default = $this->defaultTab();
 
-        return $default !== null && array_key_exists($default, $tabs) ? $default : (string) array_key_first($tabs);
+        if ($default !== null && array_key_exists($default, $tabs)) {
+            return $default;
+        }
+
+        $first = array_key_first($tabs);
+
+        return $first === null ? null : (string) $first;
     }
 
     /**
@@ -334,10 +368,11 @@ trait WithRecordTable
             $filters[$key]($query, $value);
         }
 
-        $tab = $this->activeTab();
+        $tabs = $this->recordTabs();
+        $tab = $this->activeTabIn($tabs);
 
         if ($tab !== null) {
-            $this->recordTabs()[$tab]['scope']($query);
+            $tabs[$tab]['scope']($query);
         }
 
         if ($sort !== null) {
