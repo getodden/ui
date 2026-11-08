@@ -49,7 +49,7 @@
             summary() {
                 if (this.selected.length === 0) return this.placeholder
                 if (this.selected.length > 2) return this.countText.replace(':count', this.selected.length)
-                return this.selected.map((value) => this.options.find((option) => option.value === value)?.label ?? value).join(', ')
+                return this.selected.map((value) => this.options.find((option) => option.value === String(value))?.label ?? value).join(', ')
             },
             show(position) {
                 if (this.values.length === 0) return
