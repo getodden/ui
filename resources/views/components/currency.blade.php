@@ -9,7 +9,7 @@
 
     $field = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null);
     $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
-    $controlAttributes = $field->controlAttributes($attributes, $required)->merge(['step' => '0.01', 'inputmode' => 'decimal'])->class(["block w-full rounded-control border bg-white py-2 pl-8 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus-visible:outline-primary-400", filled($currency) ? 'pr-14' : 'pr-3', $borderClasses]);
+    $controlAttributes = $field->controlAttributes($attributes, $required)->merge(['step' => '0.01', 'inputmode' => 'decimal', 'style' => 'padding-left: calc(1.25rem + '.mb_strlen((string) $symbol).'ch)'])->class(["block w-full rounded-control border bg-white py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-400 dark:focus-visible:outline-primary-400", filled($currency) ? 'pr-14' : 'pr-3', $borderClasses]);
 @endphp
 
 <x-ui::field :id="$field->id" :label="$label" :hint="$hint" :error="$field->error" :required="$required">

@@ -9,7 +9,7 @@
         'type' => $tag === 'button' ? 'button' : null,
         'href' => $tag === 'a' ? $href : null,
         'disabled' => $tag === 'button' && $disabled ? true : null,
-    ]))->class(["flex w-full items-center gap-2 px-3 py-2 text-left text-sm focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50", $variantClasses]);
+    ]))->class(["flex w-full items-center gap-2 px-3 py-2 text-left text-sm focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400 disabled:cursor-not-allowed disabled:opacity-50", $variantClasses]);
 @endphp
 
 <{{ $tag }} role="menuitem" tabindex="-1" {{ $itemAttributes }}>
