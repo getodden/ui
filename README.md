@@ -95,7 +95,7 @@ Two fields bound to the same key on one page get the same id, so give one of the
 
 Two checkboxes bound to the same key get the same id, so give one an explicit `id`. A radio group puts `wire:model` on every radio, not on the fieldset.
 
-`multiselect` follows the select-only combobox pattern: the button holds focus, arrows move the highlighted option, Space and Enter toggle it, Escape closes the list. It writes strings, so a property that holds integers comes back as strings. With a `name` (and no `wire:model`) it posts `name[]` fields.
+`multiselect` follows the select-only combobox pattern: the button holds focus, arrows move the highlighted option, Space and Enter toggle it, Escape closes the list. It writes strings once the visitor toggles an option, so a property that holds integers comes back as strings. With a `name` (and no `wire:model`) it posts `name[]` fields.
 
 `combobox` calls a public method of your component with what the visitor typed, after a pause, and shows what it returns as options. The method returns `[['id' => '7', 'label' => 'Ada']]`. Only the latest search is shown. Anyone can call that method with any string, so authorise inside it, cap the query length and the number of results, return only `id` and `label`, and mark it `#[Renderless]`. If your application refuses every component method that is not marked as a read while a session is read-only or a workspace is locked, mark the search method as a read too, or every search is refused there:
 

@@ -25,6 +25,7 @@
         <x-ui::radio-group label="Contact method" wire:model="contactMethod" :options="['email' => 'Email', 'phone' => ['label' => 'Phone', 'hint' => 'Weekdays only'], 'post' => 'Post']" hint="How we reach you" />
         <x-ui::multiselect label="Tags" wire:model="tags" :options="$moreTags ? ['x' => 'Xray', 'a' => 'Alpha', 'b' => 'Beta', 'c' => 'Gamma', 'd' => 'Delta'] : ['a' => 'Alpha', 'b' => 'Beta', 'c' => 'Gamma', 'd' => 'Delta']" />
         <x-ui::combobox label="Customer" id="customer" wire:model="customer" search="searchCustomers" :value-label="$customerName" placeholder="Type a name" hint="Searches as you type" />
+        <x-ui::multiselect label="Numeric tags" id="numeric-tags" wire:model="numericTags" :options="[3 => 'Alpha', 5 => 'Beta', 7 => 'Gamma']" />
         <x-ui::combobox label="Owner" id="owner" wire:model="owner" search="searchCustomers" :minimum="3" />
         <x-ui::file label="Attachment" wire:model="attachment" />
         <x-ui::button type="submit" id="forms-submit">Validate</x-ui::button>
@@ -44,6 +45,11 @@
         @if ($moreTabs)
             <x-ui::tab name="history">History panel</x-ui::tab>
         @endif
+    </x-ui::tabs>
+
+    <x-ui::tabs id="blank-tabs" label="Unbound sections" wire:model="blankTab" :tabs="['one' => 'One', 'two' => 'Two']">
+        <x-ui::tab name="one">One panel</x-ui::tab>
+        <x-ui::tab name="two">Two panel</x-ui::tab>
     </x-ui::tabs>
 
     <x-ui::description-list id="forms-details" :items="['Name' => 'Acme', 'Phone' => '']">

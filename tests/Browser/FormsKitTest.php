@@ -439,3 +439,40 @@ it('does not run a disabled menu item when it is activated', function (): void {
     $page->assertScript('document.getElementById("menu-disabled").tagName === "BUTTON"')
         ->assertScript('document.getElementById("last-action").textContent === ""');
 });
+
+it('selects the first tab when the bound value matches no tab', function (): void {
+    $page = visit('/');
+    $page->script('new Promise((resolve) => setTimeout(resolve, 500))');
+
+    $page->assertScript('document.querySelector("#blank-tabs [role=tab][aria-selected=true]").textContent.trim() === "One"')
+        ->assertScript('document.querySelector("#blank-tabs [role=tab][tabindex=\\"0\\"]") !== null')
+        ->assertScript(FORMS_WIRE.'.blankTab === "one"')
+        ->assertSee('One panel');
+});
+
+it('selects the first tab again when the selected tab is removed', function (): void {
+    $page = visit('/');
+
+    $page->click('#forms-more-tabs');
+    $page->script(formsSettled('true'));
+    $page->click('History')->assertScript(FORMS_WIRE.'.tab === "history"');
+
+    $page->click('#forms-more-tabs');
+    $page->script(formsSettled('true'));
+
+    $page->assertScript(FORMS_WIRE.'.tab === "details"')
+        ->assertScript('document.querySelector("#forms-tabs [role=tab][aria-selected=true]").textContent.trim() === "Details"')
+        ->assertSee('Details panel');
+});
+
+it('shows the labels of integer multiselect values', function (): void {
+    $page = visit('/');
+
+    $page->assertScript('document.querySelector("#numeric-tags").textContent.trim() === "Alpha, Beta"')
+        ->click('#numeric-tags');
+    $page->script('document.getElementById("numeric-tags-option-2").click()');
+
+    $page->assertScript('document.querySelector("#numeric-tags").textContent.trim() === "3 selected"');
+    $page->script('document.getElementById("numeric-tags-option-0").click()');
+    $page->assertScript('document.querySelector("#numeric-tags").textContent.trim() === "Beta, Gamma"');
+});

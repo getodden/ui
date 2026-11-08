@@ -31,6 +31,11 @@ final class FormsDemo extends Component
      */
     public array $tags = ['b'];
 
+    /**
+     * @var list<int>
+     */
+    public array $numericTags = [3, 5];
+
     public string $customer = '';
 
     public string $customerName = '';
@@ -42,6 +47,8 @@ final class FormsDemo extends Component
     public bool $moreTabs = false;
 
     public string $tab = 'details';
+
+    public string $blankTab = '';
 
     public bool $sectionOpen = false;
 
