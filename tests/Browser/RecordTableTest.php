@@ -55,8 +55,8 @@ it('filters rows as the visitor types and keeps the search in the url', function
     $page = visit('/');
 
     $page->type('#fruit-search', 'berry')
-        ->assertSee('Raspberry')
-        ->assertDontSee('Banana')
+        ->assertSeeIn(FRUIT_TABLE, 'Raspberry')
+        ->assertDontSeeIn(FRUIT_TABLE, 'Banana')
         ->assertScript(FRUIT_NAMES.' === 4')
         ->assertScript('new URL(location.href).searchParams.get("search") === "berry"');
 });
@@ -65,8 +65,8 @@ it('filters by colour and updates the url', function (): void {
     $page = visit('/');
 
     $page->select('#fruit-colour', 'purple')
-        ->assertSee('Plum')
-        ->assertDontSee('Banana')
+        ->assertSeeIn(FRUIT_TABLE, 'Plum')
+        ->assertDontSeeIn(FRUIT_TABLE, 'Banana')
         ->assertScript(FRUIT_NAMES.' === 4')
         ->assertScript('new URL(location.href).searchParams.get("filters[colour]") === "purple"');
 });
@@ -74,15 +74,15 @@ it('filters by colour and updates the url', function (): void {
 it('moves between pages and back to the first page when the filter changes', function (): void {
     $page = visit('/');
 
-    $page->assertSee('Apple')->assertDontSee('Kiwi')
+    $page->assertSeeIn(FRUIT_TABLE, 'Apple')->assertDontSeeIn(FRUIT_TABLE, 'Kiwi')
         ->click('[aria-label="Go to page 2"]')
-        ->assertSee('Kiwi')
-        ->assertDontSee('Apple')
+        ->assertSeeIn(FRUIT_TABLE, 'Kiwi')
+        ->assertDontSeeIn(FRUIT_TABLE, 'Apple')
         ->assertScript('document.querySelector("nav[aria-label=Pagination] [aria-current=page]").textContent.includes("2")')
         ->click('Next')
         ->assertScript('document.querySelector("nav[aria-label=Pagination] [aria-current=page]").textContent.includes("3")')
         ->select('#fruit-colour', 'green')
-        ->assertSee('Avocado')
+        ->assertSeeIn(FRUIT_TABLE, 'Avocado')
         ->assertDontSee('Pagination');
 });
 
