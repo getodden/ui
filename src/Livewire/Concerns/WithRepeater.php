@@ -63,17 +63,21 @@ trait WithRepeater
     public function updatedWithRepeater(string $path): void
     {
         foreach (array_keys($this->repeaters()) as $property) {
-            if ($this->repeaterSpec((string) $property) !== null) {
-                $this->{$property} = RepeaterRows::onlyRows($this->{$property});
+            $spec = $this->repeaterSpec((string) $property);
+
+            if ($spec !== null) {
+                $this->{$property} = RepeaterRows::within(RepeaterRows::onlyRows($this->{$property}), $spec);
             }
         }
-
-        $this->keyRepeaterRows();
     }
 
-    public function renderingWithRepeater(View $view): void
+    public function renderingWithRepeater(?View $view = null): void
     {
         $this->keyRepeaterRows();
+
+        if ($view === null) {
+            return;
+        }
 
         foreach (array_keys($this->repeaters()) as $property) {
             if ($this->repeaterSpec((string) $property) !== null) {
@@ -142,7 +146,7 @@ trait WithRepeater
         return $position === false ? null : $property.'.'.$position.($match[2] ?? '');
     }
 
-    private function repeaterSpec(string $property): ?RepeaterSpec
+    protected function repeaterSpec(string $property): ?RepeaterSpec
     {
         $spec = $this->repeaters()[$property] ?? null;
 

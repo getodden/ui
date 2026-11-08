@@ -69,6 +69,25 @@ final class RepeaterRows
      * @param  array<mixed>  $rows
      * @return list<array<string, mixed>>
      */
+    public static function within(array $rows, RepeaterSpec $spec): array
+    {
+        $rows = self::withKeys($rows);
+
+        if ($spec->max !== null) {
+            $rows = array_slice($rows, 0, $spec->max);
+        }
+
+        while (count($rows) < $spec->min) {
+            $rows[] = [...$spec->blank, self::KEY => self::newKey()];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<mixed>  $rows
+     * @return list<array<string, mixed>>
+     */
     public static function add(array $rows, RepeaterSpec $spec): array
     {
         $rows = self::withKeys($rows);

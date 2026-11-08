@@ -22,6 +22,11 @@ final class RepeaterDemo extends Component
         ['label' => 'Home', 'number' => '555 0102'],
     ];
 
+    /**
+     * @var list<array<string, mixed>>
+     */
+    public array $nicknames = [['label' => 'Chief']];
+
     public bool $saved = false;
 
     /**
@@ -29,7 +34,10 @@ final class RepeaterDemo extends Component
      */
     protected function repeaters(): array
     {
-        return ['phones' => new RepeaterSpec(min: 1, max: 5, blank: ['label' => '', 'number' => ''])];
+        return [
+            'phones' => new RepeaterSpec(min: 1, max: 5, blank: ['label' => '', 'number' => '']),
+            'nicknames' => new RepeaterSpec(max: 3, blank: ['label' => '']),
+        ];
     }
 
     public function save(): void
@@ -37,7 +45,7 @@ final class RepeaterDemo extends Component
         $this->saved = false;
 
         $this->validate([
-            'phones' => ['required', 'array', 'min:1'],
+            'phones' => ['required', 'array', 'min:1', 'max:5'],
             'phones.*.label' => ['required', 'string', 'max:40'],
             'phones.*.number' => ['required', 'string', 'max:40'],
         ]);

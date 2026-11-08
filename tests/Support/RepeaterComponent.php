@@ -56,7 +56,7 @@ final class RepeaterComponent extends Component
     {
         return <<<'BLADE'
         <div>
-            <x-ui::repeater label="People" name="items" :rows="$items" :min="1" :max="4" item-label="Person">
+            <x-ui::repeater label="People" name="items" :rows="$items" item-label="Person">
                 @foreach ($items as $index => $item)
                     <x-ui::repeater.row :index="$index">
                         <x-ui::input label="Name" wire:model="items.{{ $index }}.name" />

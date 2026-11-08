@@ -1,6 +1,6 @@
 @props(['index'])
 
-@aware(['name', 'rows' => [], 'min' => 0, 'itemLabel' => null])
+@aware(['name', 'rows' => [], 'itemLabel' => null])
 
 @php
     $rows = array_values($rows);
@@ -12,7 +12,7 @@
     $title = $itemLabel.' '.($index + 1);
     $titleId = 'ui-'.trim((string) preg_replace('/[^A-Za-z0-9_-]+/', '-', $name), '-').'-row-'.$index.'-title';
     $keyScript = \Illuminate\Support\Js::from($key);
-    $canRemove = count($rows) > (int) $min;
+    $canRemove = count($rows) > ((isset($this) && method_exists($this, 'repeaterSpec') ? $this->repeaterSpec((string) $name)?->min : null) ?? 0);
     $rowErrors = ($errors ?? null) instanceof \Illuminate\Support\ViewErrorBag ? $errors->getBag('default') : null;
     $rowError = $rowErrors?->first($name.'.'.$index);
     $rowError = filled($rowError) ? $rowError : null;

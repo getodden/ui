@@ -50,7 +50,7 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::sparkline>` | `label` (required), `values` |
 | `<x-ui::donut-chart>` | `label`, `label-visible`, `segments` |
 | `<x-ui::stat>` | `label` (required), `value`, `delta`, `direction` up, down or flat, `sentiment` positive, negative or neutral, `delta-label`, `sparkline` (list of values) |
-| `<x-ui::repeater>` | `label` (required), `name` (the array property, required), `rows` (that property), `min`, `max`, `item-label` (default "Item"), `add-label`, `hint`, `error`; rows go in the slot |
+| `<x-ui::repeater>` | `label` (required), `name` (the array property, required), `rows` (that property), `item-label` (default "Item"), `add-label`, `hint`, `error`; rows go in the slot |
 | `<x-ui::repeater.row>` | `index` (required); the row's fields go in the slot |
 | `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
@@ -179,7 +179,7 @@ class EditContact extends Component
 ```
 
 ```blade
-<x-ui::repeater label="Phone numbers" name="phones" :rows="$phones" :min="1" :max="5" item-label="Phone" add-label="Add phone">
+<x-ui::repeater label="Phone numbers" name="phones" :rows="$phones" item-label="Phone" add-label="Add phone">
     @foreach ($phones as $index => $phone)
         <x-ui::repeater.row :index="$index">
             <x-ui::input label="Label" wire:model="phones.{{ $index }}.label" />
@@ -191,7 +191,7 @@ class EditContact extends Component
 
 Each row carries a `_key` entry that the trait adds when the component boots and when the property is updated from the browser. The row `<li>` is keyed by it, so Livewire moves the same DOM element when rows are reordered and `wire:model` never lands on another row. Validate with `phones.*.number` rules: the error of `phones.3.number` shows on the field in the fourth row, and an error on `phones` itself shows under the list. The trait also keys the rows before each render, so assigning or resetting the property in an action is safe. A row that is not an array throws; scalar lists are not repeaters. The `_key` entry is part of the data: a rule such as `phones.*` => `array:label,number` fails on it, so list `Odden\Ui\Support\RepeaterRows::KEY` too, and strip the keys with `RepeaterRows::withoutKeys($validated['phones'])` before you save. A message on a row itself (`phones.3`) shows inside that row. Moving, reordering and removing rows carries each row's errors with it. Repeaters cannot be nested.
 
-The trait adds `addRepeaterRow($property)`, `removeRepeaterRow($property, $key)`, `moveRepeaterRow($property, $key, 'up'|'down')` and `reorderRepeaterRows($property, $keys)`. They are public like any Livewire action, so they only act on properties listed in `repeaters()`, ignore unknown keys and directions, refuse to go above `max` or below `min`, and accept a reorder only when it lists exactly the current keys. The `min` and `max` props on the component only decide which buttons are disabled; the limits that hold are the ones in `RepeaterSpec`. The buttons move focus to where you would expect and announce the result in a polite live region. Dragging uses the browser's drag and drop on the handle, so it works with a mouse only; the arrow buttons are the keyboard and touch route.
+The trait adds `addRepeaterRow($property)`, `removeRepeaterRow($property, $key)`, `moveRepeaterRow($property, $key, 'up'|'down')` and `reorderRepeaterRows($property, $keys)`. They are public like any Livewire action, so they only act on properties listed in `repeaters()`, ignore unknown keys and directions, refuse to go above `max` or below `min`, and accept a reorder only when it lists exactly the current keys. The component reads `min` and `max` from the `RepeaterSpec`, so the buttons and the server cannot disagree, and a property set straight from the browser is cut to `max` and padded with blank rows up to `min`. The buttons move focus to where you would expect and announce the result in a polite live region. Dragging uses the browser's drag and drop on the handle, so it works with a mouse only; the arrow buttons are the keyboard and touch route.
 
 ### Table
 
