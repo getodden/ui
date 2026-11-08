@@ -41,6 +41,20 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::select>` | the field props, `options` (value => label), `placeholder`, `value`, and a slot |
 | `<x-ui::toggle>` | the field props; renders a switch |
 | `<x-ui::icon>` | `name` (for example `fas-check`), `size` sm, md, lg |
+| `<x-ui::date>`, `<x-ui::datetime>` | the field props; native `date` and `datetime-local` inputs |
+| `<x-ui::number>` | the field props; a native `number` input, so `min`, `max` and `step` pass through |
+| `<x-ui::currency>` | the field props, `symbol` (default `$`), `currency` (a code shown after the amount and read as the input's description), `step` (default `0.01`) |
+| `<x-ui::checkbox>` | the field props; the label sits beside the box |
+| `<x-ui::radio-group>` | the field props, `options` (value => label, or value => `['label' => ..., 'hint' => ...]`), `value`; a fieldset whose label is the legend |
+| `<x-ui::multiselect>` | the field props, `options` (value => label), `value` (list), `placeholder` |
+| `<x-ui::combobox>` | the field props, `search` (a method on your component, required), `value`, `value-label`, `debounce` in milliseconds (default 250), `minimum` characters before searching (default 0) |
+| `<x-ui::file>` | the field props; `accept` and `multiple` pass through |
+| `<x-ui::collapsible>` | `heading` (required), `description`, `level` (default 2), `open`; `wire:model` binds the open state |
+| `<x-ui::tabs>` and `<x-ui::tab>` | `id` (required) and `label` on tabs, `tabs` (key => label), `selected`, `wire:model`; `name` on each tab |
+| `<x-ui::dropdown>` and `<x-ui::dropdown.item>` | `label` (required), `id`, `icon`, `icon-only`, `variant`, `size`, `align` start or end on the dropdown; `href`, `icon`, `variant` default or danger, `disabled` on the item |
+| `<x-ui::page-header>` | `title` (required), `description`, `breadcrumbs`, `level` (default 1); `actions` slot |
+| `<x-ui::description-list>` and `<x-ui::description-list.item>` | `items` (label => value) and item children with `label` |
+| `<x-ui::empty-state>` | `heading` (required), `description`, `icon`, `level` (default 3); `actions` slot |
 | `<x-ui::editor>` | the field props, `format` html or json, `toolbar` (list of tools, `[]` for none), `mentions`, `mention-search`, `mention-char` |
 | `<x-ui::board>` | `label` (required unless you pass `aria-label` or `aria-labelledby`), `columns` (key => label, offered in each card's Move to select) |
 | `<x-ui::board.column>` | `column` (key), `label`, `count`, `total` (text, optional), `has-more` |
@@ -65,6 +79,51 @@ Two fields bound to the same key on one page get the same id, so give one of the
 ```blade
 <x-ui::input label="Email" wire:model.blur="form.email" hint="We never share it" required />
 ```
+
+### Form controls
+
+`wire:model` works on all of them and the error comes from the `$errors` bag by the same key. An error on a list item such as `photos.0` is shown on the field bound to `photos`, unless the key itself has an error.
+
+```blade
+<x-ui::date label="Starts on" wire:model="startsOn" />
+<x-ui::currency label="Amount" wire:model="amount" currency="USD" />
+<x-ui::checkbox label="Send a receipt" wire:model="receipt" />
+<x-ui::radio-group label="Contact by" wire:model="method" :options="['email' => 'Email', 'phone' => ['label' => 'Phone', 'hint' => 'Weekdays only']]" />
+<x-ui::multiselect label="Tags" wire:model="tags" :options="$tagOptions" />
+<x-ui::file label="Attachment" wire:model="attachment" />
+```
+
+Two checkboxes bound to the same key get the same id, so give one an explicit `id`. A radio group puts `wire:model` on every radio, not on the fieldset.
+
+`multiselect` follows the select-only combobox pattern: the button holds focus, arrows move the highlighted option, Space and Enter toggle it, Escape closes the list. It writes strings once the visitor toggles an option, so a property that holds integers comes back as strings. With a `name` (and no `wire:model`) it posts `name[]` fields.
+
+`combobox` calls a public method of your component with what the visitor typed, after a pause, and shows what it returns as options. The method returns `[['id' => '7', 'label' => 'Ada']]`. Only the latest search is shown. Anyone can call that method with any string, so authorise inside it, cap the query length and the number of results, return only `id` and `label`, and mark it `#[Renderless]`. The bound value can be set to any id from the browser, so resolve it through the same scoped query when you use it; never trust that it came from your search method. The same goes for `multiselect` values. If your application refuses every component method that is not marked as a read while a session is read-only or a workspace is locked, mark the search method as a read too, or every search is refused there:
+
+```blade
+<x-ui::combobox label="Customer" wire:model="customerId" search="searchCustomers" :value-label="$customerName" />
+```
+
+The bound value is the chosen `id`, or an empty string while the text is edited or nothing is chosen. Text that matches no choice is cleared when focus leaves the field. `value-label` is the text to show for a value that is already set; change the property and the label together and the field shows the new label without being replaced, so focus is kept. The `search` value must be a plain method name.
+
+### Layout pieces
+
+```blade
+<x-ui::page-header title="Ada Lovelace" :breadcrumbs="[['label' => 'Contacts', 'href' => route('contacts')], ['label' => 'Ada Lovelace']]">
+    <x-slot:actions>
+        <x-ui::dropdown label="Actions" align="end">
+            <x-ui::dropdown.item wire:click="archive">Archive</x-ui::dropdown.item>
+            <x-ui::dropdown.item variant="danger" wire:click="askToDelete">Delete</x-ui::dropdown.item>
+        </x-ui::dropdown>
+    </x-slot:actions>
+</x-ui::page-header>
+
+<x-ui::tabs id="contact-tabs" label="Contact sections" wire:model="tab" :selected="$tab" :tabs="['details' => 'Details', 'notes' => 'Notes']">
+    <x-ui::tab name="details">...</x-ui::tab>
+    <x-ui::tab name="notes">...</x-ui::tab>
+</x-ui::tabs>
+```
+
+The last breadcrumb is the current page. `tabs` activates a tab as soon as it gets focus with the arrow keys, Home or End; all panels are rendered and hidden with CSS, so state inside them is kept. The dropdown is the menu-button pattern: Enter, Space or the arrow keys open it onto the first (or with Up, the last) item; arrows, Home, End and the first letter of an item move focus; Escape, Tab, an outside click or choosing an item closes it. A `disabled` item is skipped by the keyboard. Give `<x-ui::dropdown>` an `id` when a test or label needs a stable one; the button is then `{id}-trigger`. Without one, the ids come from the label, the `wire:key` and the content, so identical dropdowns, collapsibles or cards on one page need an `id` or a different `wire:key`. Pass `:selected` with `wire:model` on tabs so the server renders the bound tab.
 
 ### Modal
 
@@ -299,6 +358,8 @@ class Contacts extends Component
 - Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
 - The repeater is a labelled group with an ordered list of labelled row groups. Each row has move up, move down and remove buttons named after the row, disabled at the ends and at the minimum; moving, adding and removing announce the result and keep focus in the list. The drag handle is hidden from assistive technology because the buttons do the same job.
 - The board is a group of labelled column sections. Each card has a labelled Move to select, so a move never needs a pointer, and a polite status region announces each move or refusal. The board is `aria-busy` while a move is saved.
+- Radio groups are fieldsets with a legend; the multiselect and combobox expose `role=combobox` with `aria-expanded`, `aria-controls` and `aria-activedescendant`, and the combobox announces the result count in a status region.
+- Tabs follow the ARIA tabs pattern with one tab stop and arrow-key movement; the dropdown follows the menu-button pattern; the collapsible heading holds a button with `aria-expanded` and `aria-controls`; breadcrumbs sit in a labelled `nav` with `aria-current="page"` on the last.
 
 ## Development
 
