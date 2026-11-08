@@ -50,6 +50,8 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::sparkline>` | `label` (required), `values` |
 | `<x-ui::donut-chart>` | `label`, `label-visible`, `segments` |
 | `<x-ui::stat>` | `label` (required), `value`, `delta`, `direction` up, down or flat, `sentiment` positive, negative or neutral, `delta-label`, `sparkline` (list of values) |
+| `<x-ui::repeater>` | `label` (required), `name` (the array property, required), `rows` (that property), `min`, `max`, `item-label` (default "Item"), `add-label`, `hint`, `error`; rows go in the slot |
+| `<x-ui::repeater.row>` | `index` (required); the row's fields go in the slot |
 | `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
@@ -155,6 +157,42 @@ Set `:reorderable="false"` on the board when the query decides the order: the up
 
 `boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, a read. If your component runs behind a write guard that classifies public methods as reads or writes, the guard must be told that `loadMoreCards` from `WithBoard` is a read; a trait method cannot carry your own attribute, so the guard has to list it itself, otherwise a read-only user can never page past the first cards. It raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
 
+### Repeater
+
+A list of row sub-forms bound to an array property, with add, remove and reorder. Use `WithRepeater` for the actions and register each repeater property with its limits:
+
+```php
+use Odden\Ui\Livewire\Concerns\WithRepeater;
+use Odden\Ui\Support\RepeaterSpec;
+
+class EditContact extends Component
+{
+    use WithRepeater;
+
+    public array $phones = [['label' => 'Office', 'number' => '']];
+
+    protected function repeaters(): array
+    {
+        return ['phones' => new RepeaterSpec(min: 1, max: 5, blank: ['label' => '', 'number' => ''])];
+    }
+}
+```
+
+```blade
+<x-ui::repeater label="Phone numbers" name="phones" :rows="$phones" :min="1" :max="5" item-label="Phone" add-label="Add phone">
+    @foreach ($phones as $index => $phone)
+        <x-ui::repeater.row :index="$index">
+            <x-ui::input label="Label" wire:model="phones.{{ $index }}.label" />
+            <x-ui::input label="Number" wire:model="phones.{{ $index }}.number" />
+        </x-ui::repeater.row>
+    @endforeach
+</x-ui::repeater>
+```
+
+Each row carries a `_key` entry that the trait adds when the component boots and when the property is updated from the browser. The row `<li>` is keyed by it, so Livewire moves the same DOM element when rows are reordered and `wire:model` never lands on another row. Validate with `phones.*.number` rules: the error of `phones.3.number` shows on the field in the fourth row, and an error on `phones` itself shows under the list. If your own code appends rows, call `$this->keyRepeaterRows()` afterwards. A row without a key throws.
+
+The trait adds `addRepeaterRow($property)`, `removeRepeaterRow($property, $key)`, `moveRepeaterRow($property, $key, 'up'|'down')` and `reorderRepeaterRows($property, $keys)`. They are public like any Livewire action, so they only act on properties listed in `repeaters()`, ignore unknown keys and directions, refuse to go above `max` or below `min`, and accept a reorder only when it lists exactly the current keys. The `min` and `max` props on the component only decide which buttons are disabled; the limits that hold are the ones in `RepeaterSpec`. The buttons move focus to where you would expect and announce the result in a polite live region. Dragging uses the browser's drag and drop on the handle, so it works with a mouse only; the arrow buttons are the keyboard and touch route.
+
 ### Table
 
 ```blade
@@ -259,6 +297,7 @@ class Contacts extends Component
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
 - The editor's toolbar is one tab stop with arrow-key movement and `aria-pressed` on toggles; the editable area is a labelled `textbox`, and mention suggestions are a `listbox` it points at with `aria-activedescendant`.
 - Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
+- The repeater is a labelled group with an ordered list of labelled row groups. Each row has move up, move down and remove buttons named after the row, disabled at the ends and at the minimum; moving, adding and removing announce the result and keep focus in the list. The drag handle is hidden from assistive technology because the buttons do the same job.
 - The board is a group of labelled column sections. Each card has a labelled Move to select, so a move never needs a pointer, and a polite status region announces each move or refusal. The board is `aria-busy` while a move is saved.
 
 ## Development
