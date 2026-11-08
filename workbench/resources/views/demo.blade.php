@@ -69,6 +69,8 @@
         <p id="deleted">Deleted item {{ $deletedId }}</p>
     @endif
 
+    @include('workbench::charts')
+
     <livewire:editor-demo />
     <livewire:table-demo />
     <livewire:board-demo />
