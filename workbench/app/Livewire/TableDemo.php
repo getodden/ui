@@ -59,6 +59,41 @@ final class TableDemo extends Component
 
     public int $unrelated = 0;
 
+    public string $lastAction = '';
+
+    /**
+     * @return array<string, array{label: string, scope: Closure(Builder<*>|QueryBuilder): mixed}>
+     */
+    protected function recordTabs(): array
+    {
+        return [
+            'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query],
+            'purple' => ['label' => 'Purple', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('colour', 'purple')],
+            'pricey' => ['label' => 'Pricey', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('price', '>=', 500)],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function bulkActions(): array
+    {
+        return ['describeSelected' => 'Describe selected'];
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function describeSelected(array $keys): void
+    {
+        $this->lastAction = 'Selected: '.Fruit::query()->whereKey($keys)->orderBy('name')->pluck('name')->implode(', ');
+    }
+
+    public function inspect(int $id): void
+    {
+        $this->lastAction = 'Inspected: '.Fruit::query()->whereKey($id)->value('name');
+    }
+
     public function unrelatedAction(): void
     {
         usleep(600000);
