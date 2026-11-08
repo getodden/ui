@@ -196,6 +196,7 @@ it('keeps keyboard focus on the page checkbox after a bulk action removes the ba
 
     $page->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
         ->click('Describe selected')
+        ->wait(0.5)
         ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
 });
 
@@ -303,5 +304,18 @@ it('keeps the page checkbox in step with the page rows and focuses it after clea
     $page->wait(0.5)
         ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").indeterminate === false')
         ->click('Clear selection')
+        ->wait(0.5)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});
+
+it('returns focus to the page checkbox after a confirmed bulk action removes the bar', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
+        ->click('Remove selected')
+        ->wait(0.5)
+        ->click('Remove fruit')
+        ->wait(0.8)
+        ->assertScript('document.querySelector("#fruit-last-action").textContent === "Removed: 1"')
         ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
 });

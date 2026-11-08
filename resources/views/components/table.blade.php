@@ -29,7 +29,25 @@
     $tabClasses = 'rounded-control px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400';
 @endphp
 
-<div class="space-y-4" data-record-table>
+<div
+    class="space-y-4"
+    data-record-table
+    x-data="{
+        lastFocused: null,
+        timer: null,
+        recoverFocus() {
+            const last = this.lastFocused
+            if (! last || last.isConnected) return
+            const active = document.activeElement
+            if (active && active !== document.body && active.checkVisibility()) return
+            this.lastFocused = null
+            this.$el.querySelector('[data-select-page], thead button')?.focus()
+        }
+    }"
+    x-init="new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(() => recoverFocus(), 50) }).observe($el, { childList: true, subtree: true })"
+    x-on:focusin="lastFocused = $event.target"
+    x-on:focusin.window="if (! $el.contains($event.target) && ! $event.target.closest('[role=dialog]')) lastFocused = null"
+>
     @if ($hasTabs)
         <nav aria-label="{{ __('ui::ui.table.tabs') }}">
             <ul class="flex flex-wrap gap-1 border-b border-gray-200 pb-2 dark:border-gray-800">
@@ -50,9 +68,9 @@
         <div role="group" aria-label="{{ __('ui::ui.table.bulk_actions') }}" class="flex flex-wrap items-center gap-2 rounded-surface border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
             <span aria-hidden="true" class="font-medium">{{ trans_choice('ui::ui.table.selected', $selectedCount) }}</span>
             @foreach ($bulkActions as $method => $actionLabel)
-                <x-ui::button size="sm" :variant="$state->isDangerousBulkAction((string) $method) ? 'danger' : 'secondary'" x-on:click="const table = $el.closest('[data-record-table]'); $wire.runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }}).then(() => { if (document.activeElement === document.body) { table.querySelector('[data-select-page]')?.focus() } })">{{ $actionLabel }}</x-ui::button>
+                <x-ui::button size="sm" :variant="$state->isDangerousBulkAction((string) $method) ? 'danger' : 'secondary'" x-on:click="$wire.runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }})">{{ $actionLabel }}</x-ui::button>
             @endforeach
-            <x-ui::button size="sm" variant="ghost" x-on:click="const table = $el.closest('[data-record-table]'); $wire.clearSelection().then(() => { if (document.activeElement === document.body) { table.querySelector('[data-select-page]')?.focus() } })">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
+            <x-ui::button size="sm" variant="ghost" x-on:click="$wire.clearSelection()">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
         </div>
     @endif
 

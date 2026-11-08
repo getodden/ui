@@ -19,7 +19,7 @@
                 <td>{{ $fruit->price }}</td>
                 <td class="text-end">
                     <x-ui::table.actions :label="'Actions for '.$fruit->name">
-                        <x-ui::table.action wire:click="inspect({{ $fruit->id }})">Inspect</x-ui::table.action>
+                        <x-ui::table.action wire:click="inspect({{ \Illuminate\Support\Js::from($fruit->id) }})">Inspect</x-ui::table.action>
                     </x-ui::table.actions>
                 </td>
             </tr>
@@ -27,4 +27,6 @@
 
         <x-slot:empty>No fruit matches your search.</x-slot:empty>
     </x-ui::table>
+
+    <x-ui::confirm :confirmation="$confirmation" />
 </section>
