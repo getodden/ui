@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\View\ViewException;
 use Odden\Ui\Support\ChartData;
 use Odden\Ui\Support\ChartGeometry;
+use Odden\Ui\Support\ChartPalette;
 use Odden\Ui\Support\ChartScale;
 use Odden\Ui\Tests\Support\Html;
 
@@ -293,7 +294,7 @@ it('picks round tick values that cover the data', function (float $minimum, floa
 
 it('formats numbers compactly for axes and fully for tables', function (): void {
     expect(ChartScale::format(1234.5))->toBe('1,234.5')
-        ->and(ChartScale::format(-0.001))->toBe('0')
+        ->and(ChartScale::format(-0.0))->toBe('0')
         ->and(ChartScale::format(2.0))->toBe('2')
         ->and(ChartScale::compact(1500.0))->toBe('1.5K')
         ->and(ChartScale::compact(2000000.0))->toBe('2M')
@@ -363,4 +364,111 @@ it('passes attributes through to the chart root', function (): void {
     expect($figure->getAttribute('id'))->toBe('mine')
         ->and($figure->getAttribute('class'))->toContain('mt-4')
         ->and($figure->querySelector('table')->parentNode->parentNode->getAttribute('id'))->toBe('mine-table');
+});
+
+it('terminates and spans the data when the lowest and highest values differ only by rounding', function (float $lowest, float $highest): void {
+    $ticks = ChartScale::ticks($lowest, $highest);
+
+    expect(count($ticks))->toBeLessThan(20)
+        ->and($ticks[0])->toBeLessThanOrEqual($lowest)
+        ->and($ticks[array_key_last($ticks)])->toBeGreaterThanOrEqual($highest);
+})->with([
+    'float sum' => [0.1 + 0.2, 0.3],
+    'huge' => [1e17, 1e17 + 16],
+    'one ulp' => [1.0, 1.0 + PHP_FLOAT_EPSILON],
+]);
+
+it('draws a line chart whose values differ only by rounding', function (): void {
+    $dom = Html::render('<x-ui::line-chart label="Avg" :categories="[\'a\', \'b\']" :series="[[\'values\' => [0.1 + 0.2, 0.3]]]" />');
+
+    expect($dom->querySelectorAll('svg circle'))->toHaveCount(2);
+});
+
+it('keeps grouped bars visible with many categories and series', function (int $categories, int $series): void {
+    $names = array_map(fn (int $number): string => 'c'.$number, range(1, $categories));
+    $data = array_map(fn (int $number): array => chartSeries('s'.$number, array_fill(0, $categories, 5.0)), range(1, $series));
+
+    $geometry = ChartGeometry::bars($names, $data, false, false);
+
+    foreach ($geometry['bars'] as $bar) {
+        expect($bar['width'])->toBeGreaterThan(0.0);
+    }
+
+    expect($geometry['bars'])->toHaveCount($categories * $series);
+})->with([
+    'a month of days with six series' => [30, 6],
+    'a year with the most series' => [12, ChartData::MAXIMUM_SERIES],
+    'the most categories' => [ChartData::MAXIMUM_CATEGORIES, 6],
+]);
+
+it('lays grouped bars side by side without overlap', function (): void {
+    $bars = ChartGeometry::bars(['a'], [chartSeries('A', [1.0]), chartSeries('B', [1.0]), chartSeries('C', [1.0])], false, false)['bars'];
+
+    expect($bars[0]['x'] + $bars[0]['width'])->toBeLessThanOrEqual($bars[1]['x'] + 0.01)
+        ->and($bars[1]['x'] + $bars[1]['width'])->toBeLessThanOrEqual($bars[2]['x'] + 0.01);
+});
+
+it('keeps small values readable on axes, tooltips and in the data table', function (): void {
+    $geometry = ChartGeometry::lines(['a', 'b', 'c'], [chartSeries('Rate', [0.001, 0.0125, 0.005])]);
+    $labels = array_column($geometry['ticks'], 'label');
+
+    expect(count(array_unique($labels)))->toBe(count($labels))
+        ->and(array_column($geometry['lines'][0]['points'], 'title'))->toBe(['a, Rate: 0.001', 'b, Rate: 0.0125', 'c, Rate: 0.005'])
+        ->and(ChartData::tableRows(['a'], [chartSeries('Rate', [0.004])]))->toBe([['a', '0.004']])
+        ->and(ChartScale::format(-0.001))->toBe('-0.001')
+        ->and(ChartScale::format(0.30000000000000004))->toBe('0.3')
+        ->and(ChartScale::format(1.239))->toBe('1.24')
+        ->and(ChartScale::format(1.0E-15))->toBe('0');
+});
+
+it('gives every series a colour of its own', function (): void {
+    $paints = array_map(ChartPalette::paint(...), range(0, ChartData::MAXIMUM_SERIES - 1));
+
+    expect(array_unique($paints))->toHaveCount(ChartData::MAXIMUM_SERIES);
+});
+
+it('keeps a tiny bar on the correct side of the baseline', function (): void {
+    $vertical = ChartGeometry::bars(['a', 'b', 'c', 'd'], [chartSeries('S', [10.0, 0.001, 0.0, -0.001])], false, false);
+    [, $tiny, $zero, $tinyNegative] = $vertical['bars'];
+
+    expect($tiny['y'] + $tiny['height'])->toBeLessThanOrEqual($vertical['baseline'] + 0.01)
+        ->and($zero['y'] + $zero['height'])->toBeLessThanOrEqual($vertical['baseline'] + 0.01)
+        ->and($tinyNegative['y'])->toBeGreaterThanOrEqual($vertical['baseline'] - 0.01);
+
+    $horizontal = ChartGeometry::bars(['a', 'b'], [chartSeries('S', [10.0, -0.001])], true, false);
+
+    expect($horizontal['bars'][1]['x'] + $horizontal['bars'][1]['width'])->toBeLessThanOrEqual($horizontal['baseline'] + 0.01);
+
+    $positiveHorizontal = ChartGeometry::bars(['a', 'b'], [chartSeries('S', [-10.0, 0.001])], true, false);
+
+    expect($positiveHorizontal['bars'][1]['x'])->toBeGreaterThanOrEqual($positiveHorizontal['baseline'] - 0.01);
+});
+
+it('keeps valid donut segments that follow ignored ones and names unlabelled segments', function (): void {
+    $junk = array_fill(0, 12, ['label' => 'Zero', 'value' => 0]);
+
+    $dom = Html::render('<x-ui::donut-chart label="L" :segments="$segments" />', [
+        'segments' => [...$junk, ['label' => 'Web', 'value' => 40], ['value' => 5]],
+    ]);
+
+    $items = array_map(fn ($li) => trim($li->textContent), iterator_to_array($dom->querySelectorAll('ul li')));
+
+    expect($items)->toBe(['Web: 40 (88.9%)', 'Segment 2: 5 (11.1%)'])
+        ->and($dom->querySelector('tbody tr:last-child th')->textContent)->toBe('Segment 2');
+});
+
+it('caps donut segments at the palette size after dropping ignored ones', function (): void {
+    $segments = array_map(fn (int $number): array => ['label' => 's'.$number, 'value' => $number], range(0, 10));
+
+    $dom = Html::render('<x-ui::donut-chart label="L" :segments="$segments" />', ['segments' => $segments]);
+
+    expect($dom->querySelectorAll('ul li'))->toHaveCount(ChartData::MAXIMUM_SERIES);
+});
+
+it('names each data table toggle after its chart', function (): void {
+    $dom = Html::render('<x-ui::bar-chart label="Deals by month" :categories="[\'a\']" :series="[[\'values\' => [1]]]" />');
+
+    $button = $dom->querySelector('button');
+
+    expect($button->textContent)->toContain('Show data table', 'Deals by month');
 });

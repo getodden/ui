@@ -11,8 +11,10 @@ final class ChartScale
      */
     public static function ticks(float $minimum, float $maximum, int $target = 5): array
     {
-        if ($maximum <= $minimum) {
-            $maximum = $minimum + 1;
+        $scale = max(abs($minimum), abs($maximum));
+
+        if ($maximum - $minimum <= $scale * 1e-9) {
+            $maximum = $minimum + max(1.0, $scale * 1e-6);
         }
 
         $range = $maximum - $minimum;
@@ -37,8 +39,8 @@ final class ChartScale
         $precision = max(0, 2 - (int) floor(log10($step)));
         $ticks = [round($first * $step, $precision)];
 
-        for ($index = $first + 1; $index <= $last; $index++) {
-            $ticks[] = round($index * $step, $precision);
+        for ($offset = 1; $offset <= (int) ($last - $first); $offset++) {
+            $ticks[] = round(($first + $offset) * $step, $precision);
         }
 
         return $ticks;
@@ -46,7 +48,9 @@ final class ChartScale
 
     public static function format(float $value): string
     {
-        $formatted = number_format($value, 2, '.', ',');
+        $absolute = abs($value);
+        $decimals = $absolute > 0 && $absolute < 1 ? min(10, 2 - (int) floor(log10($absolute))) : 2;
+        $formatted = number_format($value, $decimals, '.', ',');
         $trimmed = rtrim(rtrim($formatted, '0'), '.');
 
         return in_array($trimmed, ['-0', ''], true) ? '0' : $trimmed;

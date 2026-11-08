@@ -54,7 +54,8 @@ final class ChartGeometry
         $bandLength = $horizontal ? ($plot['bottom'] - $plot['top']) / $count : ($plot['right'] - $plot['left']) / $count;
         $groups = $stacked ? 1 : $seriesCount;
         $usable = $bandLength * 0.7;
-        $thickness = ($usable - 2 * ($groups - 1)) / $groups;
+        $gap = min(2.0, $usable * 0.1 / max(1, $groups - 1));
+        $thickness = ($usable - $gap * ($groups - 1)) / $groups;
 
         $bars = [];
 
@@ -66,11 +67,17 @@ final class ChartGeometry
                     continue;
                 }
 
-                $offset = $bandStart + ($stacked ? 0 : $seriesIndex) * ($thickness + 2);
-                $from = $valueAxis($interval[0]);
-                $to = $valueAxis($interval[1]);
-                $length = max(1.0, round(abs($to - $from), 2));
-                $start = round(min($from, $to), 2);
+                $offset = $bandStart + ($stacked ? 0 : $seriesIndex) * ($thickness + $gap);
+                $lowEnd = $valueAxis($interval[0]);
+                $highEnd = $valueAxis($interval[1]);
+                $length = max(1.0, round(abs($highEnd - $lowEnd), 2));
+                $growth = $horizontal ? 1.0 : -1.0;
+                $start = round(
+                    $series[$seriesIndex]['values'][$position] >= 0
+                        ? min($lowEnd, $lowEnd + $growth * $length)
+                        : min($highEnd, $highEnd - $growth * $length),
+                    2,
+                );
                 $title = $categories[$position].', '.$series[$seriesIndex]['name'].': '.ChartScale::format((float) $series[$seriesIndex]['values'][$position]);
 
                 $bars[] = $horizontal
