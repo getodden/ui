@@ -18,7 +18,13 @@
             this.top = box.bottom + 4
             this.right = window.innerWidth - box.right
             this.open = true
-            this.$nextTick(() => this.items().at(index)?.focus())
+            this.$nextTick(() => {
+                const height = $refs.menu.offsetHeight
+                if (box.bottom + 4 + height > window.innerHeight && box.top - 4 - height >= 0) {
+                    this.top = box.top - 4 - height
+                }
+                this.items().at(index)?.focus()
+            })
         },
         hide(returnFocus) {
             if (! this.open) return
@@ -33,7 +39,7 @@
     }"
     x-on:keydown.escape="if (open) { $event.preventDefault(); hide(true) }"
     x-on:click.outside="hide(false)"
-    x-on:scroll.window.capture="hide(false)"
+    x-on:scroll.window.capture="hide($refs.menu.contains(document.activeElement))"
     x-on:resize.window="hide(false)"
 >
     <button

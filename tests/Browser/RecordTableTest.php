@@ -191,6 +191,14 @@ it('selects the page, announces the count and runs a bulk action', function (): 
         ->assertScript('document.querySelectorAll("#fruit-table tbody input[type=checkbox]:checked").length === 0');
 });
 
+it('keeps keyboard focus on the page checkbox after a bulk action removes the bar', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
+        ->click('Describe selected')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});
+
 it('clears the selection when the tab changes', function (): void {
     $page = visit('/');
 

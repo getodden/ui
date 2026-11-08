@@ -19,7 +19,7 @@
     $hasEmptySlot = filled(trim((string) $empty));
     $columns = collect($columns)->map(fn ($column): array => is_array($column) ? $column : ['label' => (string) $column]);
     $selectable = $selectableKeys !== null;
-    $pageKeys = $selectable ? array_values(array_map(strval(...), (array) $selectableKeys)) : [];
+    $pageKeys = $selectable ? array_values(array_map(strval(...), collect($selectableKeys)->all())) : [];
     $hasTabs = $state !== null && $state->tabs !== [];
     $bulkActions = $selectable && $state !== null ? $state->bulkActions : [];
     $selectedCount = $state?->selectedCount ?? 0;
@@ -29,7 +29,7 @@
     $tabClasses = 'rounded-control px-3 py-1.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 dark:focus-visible:outline-primary-400';
 @endphp
 
-<div class="space-y-4">
+<div class="space-y-4" x-data="{ restoreFocus() { if (document.activeElement === document.body) { $refs.selectPage?.focus() } } }">
     @if ($hasTabs)
         <nav aria-label="{{ __('ui::ui.table.tabs') }}">
             <ul class="flex flex-wrap gap-1 border-b border-gray-200 pb-2 dark:border-gray-800">
@@ -50,9 +50,9 @@
         <div role="group" aria-label="{{ __('ui::ui.table.bulk_actions') }}" class="flex flex-wrap items-center gap-2 rounded-surface border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
             <span aria-hidden="true" class="font-medium">{{ trans_choice('ui::ui.table.selected', $selectedCount) }}</span>
             @foreach ($bulkActions as $method => $actionLabel)
-                <x-ui::button size="sm" variant="secondary" wire:click="runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }})">{{ $actionLabel }}</x-ui::button>
+                <x-ui::button size="sm" variant="secondary" x-on:click="$wire.runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }}).then(() => restoreFocus())">{{ $actionLabel }}</x-ui::button>
             @endforeach
-            <x-ui::button size="sm" variant="ghost" wire:click="clearSelection">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
+            <x-ui::button size="sm" variant="ghost" x-on:click="$wire.clearSelection().then(() => restoreFocus())">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
         </div>
     @endif
 
@@ -75,6 +75,7 @@
                         <th scope="col" class="w-10 px-4 py-3">
                             <input
                                 type="checkbox"
+                                x-ref="selectPage"
                                 aria-label="{{ __('ui::ui.table.select_page') }}"
                                 data-keys="{{ json_encode($pageKeys) }}"
                                 class="{{ $checkboxClasses }}"
