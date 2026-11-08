@@ -24,11 +24,13 @@
                 'none' => __('ui::ui.combobox.no_matches'),
                 'one' => __('ui::ui.combobox.one_result'),
                 'many' => __('ui::ui.combobox.many_results'),
+                'failed' => __('ui::ui.combobox.failed'),
             ]),
-            value: @js($initialValue),
-            ownValue: @js($initialValue),
-            query: @js((string) ($valueLabel ?? '')),
+            value: '',
+            ownValue: '',
+            query: '',
             results: [],
+            failed: false,
             open: false,
             active: -1,
             loading: false,
@@ -36,6 +38,9 @@
             sequence: 0,
             timer: null,
             init() {
+                this.value = this.$root.dataset.value
+                this.ownValue = this.$root.dataset.value
+                this.query = this.$root.dataset.label
                 this.$watch('value', (value) => {
                     if (String(value ?? '') === this.ownValue) return
                     this.ownValue = String(value ?? '')
@@ -56,6 +61,7 @@
                     this.sequence++
                     this.results = []
                     this.searched = false
+                    this.failed = false
                     this.loading = false
                     this.close()
                     return
@@ -67,6 +73,7 @@
             async run() {
                 const sequence = ++this.sequence
                 this.loading = true
+                this.failed = false
                 try {
                     const items = await this.$wire.$call(this.method, this.query)
                     if (sequence !== this.sequence) return
@@ -76,8 +83,11 @@
                     this.searched = true
                     this.active = -1
                 } catch (error) {
-                    if (sequence === this.sequence) this.results = []
-                    throw error
+                    if (sequence === this.sequence) {
+                        this.results = []
+                        this.searched = false
+                        this.failed = true
+                    }
                 } finally {
                     if (sequence === this.sequence) this.loading = false
                 }
@@ -134,6 +144,7 @@
                     this.results = []
                     this.searched = false
                 }
+                this.failed = false
             },
             reveal() {
                 this.$nextTick(() => document.getElementById(this.id + '-option-' + this.active)?.scrollIntoView({ block: 'nearest' }))
@@ -141,12 +152,15 @@
             status() {
                 if (!this.open) return ''
                 if (this.loading) return this.text.searching
+                if (this.failed) return this.text.failed
                 if (!this.searched) return ''
                 if (this.results.length === 0) return this.text.none
                 return this.results.length === 1 ? this.text.one : this.text.many.replace(':count', this.results.length)
             }
         }"
         x-modelable="value"
+        data-value="{{ $initialValue }}"
+        data-label="{{ $valueLabel }}"
         x-on:focusout="if (!$el.contains($event.relatedTarget)) leave()"
         {{ $attributes->whereStartsWith('wire:model') }}
     >
@@ -182,12 +196,12 @@
                     role="option"
                     x-bind:id="id + '-option-' + index"
                     x-bind:aria-selected="String(value) === item.id ? 'true' : 'false'"
-                    x-bind:class="active === index ? 'bg-primary-50 dark:bg-gray-800' : ''"
+                    x-bind:class="active === index ? 'bg-primary-100 text-primary-900 ring-2 ring-inset ring-primary-700 dark:bg-primary-950 dark:text-primary-200 dark:ring-primary-400' : 'text-gray-900 dark:text-gray-100'"
                     x-text="item.label"
                     x-on:mousedown.prevent
                     x-on:mousemove="active = index"
                     x-on:click="pick(index)"
-                    class="cursor-pointer px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    class="cursor-pointer px-3 py-2 text-sm"
                 ></li>
             </template>
         </ul>
@@ -197,6 +211,13 @@
             style="display: none"
             class="absolute z-40 mt-1 w-full rounded-control border border-gray-200 bg-white px-3 py-2 text-sm text-gray-500 shadow-popover dark:border-gray-700 dark:bg-gray-900 dark:text-gray-400"
             x-text="text.none"
+        ></p>
+
+        <p
+            x-show="open && failed"
+            style="display: none"
+            class="absolute z-40 mt-1 w-full rounded-control border border-rose-700 bg-white px-3 py-2 text-sm text-rose-700 shadow-popover dark:border-rose-400 dark:bg-gray-900 dark:text-rose-400"
+            x-text="text.failed"
         ></p>
 
         <div role="status" class="sr-only" x-text="status()"></div>

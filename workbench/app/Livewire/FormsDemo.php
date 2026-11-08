@@ -33,6 +33,14 @@ final class FormsDemo extends Component
 
     public string $customer = '';
 
+    public string $customerName = '';
+
+    public string $owner = '';
+
+    public bool $moreTags = false;
+
+    public bool $moreTabs = false;
+
     public string $tab = 'details';
 
     public bool $sectionOpen = false;
@@ -62,6 +70,11 @@ final class FormsDemo extends Component
             $customers,
             fn (array $customer): bool => $query === '' || stripos($customer['label'], mb_substr($query, 0, 50)) !== false,
         ));
+    }
+
+    public function updatedCustomer(string $value): void
+    {
+        $this->customerName = collect($this->searchCustomers(''))->firstWhere('id', (int) $value)['label'] ?? '';
     }
 
     public function markAction(string $action): void

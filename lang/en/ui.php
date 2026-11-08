@@ -92,6 +92,7 @@ return [
         'no_matches' => 'No matches',
         'one_result' => '1 result available',
         'many_results' => ':count results available',
+        'failed' => 'Search failed. Try again.',
     ],
     'breadcrumbs' => 'Breadcrumb',
     'not_set' => 'Not set',

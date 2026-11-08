@@ -9,6 +9,7 @@
     $listboxId = $field->id.'-listbox';
     $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
     $triggerAttributes = $field->controlAttributes($attributes->whereDoesntStartWith('wire:model'), $required)->except(['name', 'required'])->class(["flex w-full items-center justify-between gap-2 rounded-control border bg-white px-3 py-2 text-left text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400", $borderClasses]);
+    $triggerAttributes = $required ? $triggerAttributes->merge(['aria-required' => 'true']) : $triggerAttributes;
     $triggerAttributes = filled($label) ? $triggerAttributes->merge(['aria-labelledby' => $labelId.' '.$summaryId]) : $triggerAttributes;
 @endphp
 
@@ -17,13 +18,26 @@
         class="relative"
         x-data="{
             id: @js($field->id),
-            selected: @js($initial),
-            labels: @js(collect($items)->pluck('label', 'value')->all()),
-            values: @js(array_column($items, 'value')),
+            selected: [],
+            revision: 0,
             placeholder: @js(filled($placeholder) ? $placeholder : __('ui::ui.multiselect.placeholder')),
             countText: @js(__('ui::ui.multiselect.count')),
             open: false,
             active: -1,
+            init() {
+                this.selected = JSON.parse(this.$root.dataset.initial)
+                this.$nextTick(() => {
+                    this.revision++
+                    new MutationObserver(() => this.revision++).observe(this.$refs.list, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['data-label', 'data-value'] })
+                })
+            },
+            get options() {
+                this.revision
+                return [...(this.$refs.list?.querySelectorAll('[role=option]') ?? [])].map((option) => ({ value: option.dataset.value, label: option.dataset.label }))
+            },
+            get values() {
+                return this.options.map((option) => option.value)
+            },
             has(value) {
                 return this.selected.map(String).includes(value)
             },
@@ -35,7 +49,7 @@
             summary() {
                 if (this.selected.length === 0) return this.placeholder
                 if (this.selected.length > 2) return this.countText.replace(':count', this.selected.length)
-                return this.selected.map((value) => this.labels[value] ?? value).join(', ')
+                return this.selected.map((value) => this.options.find((option) => option.value === value)?.label ?? value).join(', ')
             },
             show(position) {
                 if (this.values.length === 0) return
@@ -61,6 +75,7 @@
             }
         }"
         x-modelable="selected"
+        data-initial="{{ json_encode($initial, JSON_THROW_ON_ERROR) }}"
         x-on:click.outside="close()"
         {{ $attributes->whereStartsWith('wire:model') }}
     >
@@ -89,6 +104,7 @@
 
         <ul
             id="{{ $listboxId }}"
+            x-ref="list"
             role="listbox"
             aria-multiselectable="true"
             tabindex="-1"
@@ -102,12 +118,13 @@
                     id="{{ $field->id }}-option-{{ $index }}"
                     role="option"
                     data-value="{{ $item['value'] }}"
+                    data-label="{{ $item['label'] }}"
                     x-bind:aria-selected="has(@js($item['value'])) ? 'true' : 'false'"
-                    x-bind:class="active === {{ $index }} ? 'bg-primary-50 dark:bg-gray-800' : ''"
+                    x-bind:class="active === {{ $index }} ? 'bg-primary-100 text-primary-900 ring-2 ring-inset ring-primary-700 dark:bg-primary-950 dark:text-primary-200 dark:ring-primary-400' : 'text-gray-900 dark:text-gray-100'"
                     x-on:mousedown.prevent
                     x-on:mousemove="active = {{ $index }}"
                     x-on:click="toggle({{ $index }})"
-                    class="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                    class="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm"
                 >
                     <span>{{ $item['label'] }}</span>
                     <x-ui::icon name="fas-check" size="sm" class="text-primary-700 dark:text-primary-400" x-show="has($el.closest('[role=option]').dataset.value)" />

@@ -10,7 +10,7 @@
     $panelId = fn (string $key): string => $id.'-panel-'.substr(sha1($key), 0, 10);
 @endphp
 
-<div id="{{ $id }}" x-data="{ selected: @js($initial), keys: @js($keys) }" x-modelable="selected" {{ $attributes->whereDoesntStartWith('aria-')->whereDoesntStartWith('wire:model') }} {{ $attributes->whereStartsWith('wire:model') }}>
+<div id="{{ $id }}" x-data="{ selected: '', init() { this.selected = this.$root.dataset.initial } }" x-modelable="selected" data-initial="{{ $initial }}" {{ $attributes->whereDoesntStartWith('aria-')->whereDoesntStartWith('wire:model') }} {{ $attributes->whereStartsWith('wire:model') }}>
     <div
         role="tablist"
         @if (filled($label)) aria-label="{{ $label }}" @endif
