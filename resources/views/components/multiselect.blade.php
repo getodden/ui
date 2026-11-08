@@ -1,0 +1,124 @@
+@props(['label' => null, 'name' => null, 'id' => null, 'hint' => null, 'error' => null, 'required' => false, 'options' => [], 'placeholder' => null, 'value' => []])
+
+@php
+    $field = \Odden\Ui\Support\FieldState::resolve($attributes, $label, $name, $id, $error, filled($hint), $errors ?? null);
+    $items = collect($options)->map(fn ($optionLabel, $optionValue): array => ['value' => (string) $optionValue, 'label' => (string) $optionLabel])->values()->all();
+    $initial = collect($value)->map(fn ($selected): string => (string) $selected)->values()->all();
+    $labelId = $field->id.'-label';
+    $summaryId = $field->id.'-summary';
+    $listboxId = $field->id.'-listbox';
+    $borderClasses = $field->error === null ? 'border-gray-400 dark:border-gray-500' : 'border-rose-700 dark:border-rose-400';
+    $triggerAttributes = $field->controlAttributes($attributes->whereDoesntStartWith('wire:model'), $required)->except(['name', 'required'])->class(["flex w-full items-center justify-between gap-2 rounded-control border bg-white px-3 py-2 text-left text-sm text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-900 dark:text-gray-100 dark:focus-visible:outline-primary-400", $borderClasses]);
+    $triggerAttributes = filled($label) ? $triggerAttributes->merge(['aria-labelledby' => $labelId.' '.$summaryId]) : $triggerAttributes;
+@endphp
+
+<x-ui::field :id="$field->id" :label="$label" :hint="$hint" :error="$field->error" :required="$required" identified>
+    <div
+        class="relative"
+        x-data="{
+            id: @js($field->id),
+            selected: @js($initial),
+            labels: @js(collect($items)->pluck('label', 'value')->all()),
+            values: @js(array_column($items, 'value')),
+            placeholder: @js(filled($placeholder) ? $placeholder : __('ui::ui.multiselect.placeholder')),
+            countText: @js(__('ui::ui.multiselect.count')),
+            open: false,
+            active: -1,
+            has(value) {
+                return this.selected.map(String).includes(value)
+            },
+            toggle(index) {
+                const value = this.values[index]
+                if (value === undefined) return
+                this.selected = this.has(value) ? this.selected.filter((item) => String(item) !== value) : [...this.selected, value]
+            },
+            summary() {
+                if (this.selected.length === 0) return this.placeholder
+                if (this.selected.length > 2) return this.countText.replace(':count', this.selected.length)
+                return this.selected.map((value) => this.labels[value] ?? value).join(', ')
+            },
+            show(position) {
+                if (this.values.length === 0) return
+                this.open = true
+                const firstSelected = this.values.findIndex((value) => this.has(value))
+                this.active = position === 'last' ? this.values.length - 1 : (firstSelected >= 0 ? firstSelected : 0)
+                this.reveal()
+            },
+            close() {
+                this.open = false
+                this.active = -1
+            },
+            move(step) {
+                this.active = Math.min(this.values.length - 1, Math.max(0, this.active + step))
+                this.reveal()
+            },
+            jump(index) {
+                this.active = index
+                this.reveal()
+            },
+            reveal() {
+                this.$nextTick(() => document.getElementById(this.id + '-option-' + this.active)?.scrollIntoView({ block: 'nearest' }))
+            }
+        }"
+        x-modelable="selected"
+        x-on:click.outside="close()"
+        {{ $attributes->whereStartsWith('wire:model') }}
+    >
+        <button
+            type="button"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-controls="{{ $listboxId }}"
+            x-bind:aria-expanded="open ? 'true' : 'false'"
+            x-bind:aria-activedescendant="open && active >= 0 ? id + '-option-' + active : null"
+            x-on:click="open ? close() : show('first')"
+            x-on:keydown.arrow-down.prevent="open ? move(1) : show('first')"
+            x-on:keydown.arrow-up.prevent="open ? move(-1) : show('last')"
+            x-on:keydown.home.prevent="open && jump(0)"
+            x-on:keydown.end.prevent="open && jump(values.length - 1)"
+            x-on:keydown.enter.prevent="open ? toggle(active) : show('first')"
+            x-on:keydown.space.prevent="open ? toggle(active) : show('first')"
+            x-on:keyup.space.prevent
+            x-on:keydown.escape="if (open) { $event.stopPropagation(); close() }"
+            x-on:keydown.tab="close()"
+            {{ $triggerAttributes }}
+        >
+            <span id="{{ $summaryId }}" class="truncate" x-text="summary()" x-bind:class="selected.length === 0 ? 'text-gray-500 dark:text-gray-400' : ''"></span>
+            <x-ui::icon name="fas-chevron-down" size="sm" class="text-gray-500 dark:text-gray-400" />
+        </button>
+
+        <ul
+            id="{{ $listboxId }}"
+            role="listbox"
+            aria-multiselectable="true"
+            tabindex="-1"
+            @if (filled($label)) aria-labelledby="{{ $labelId }}" @elseif ($attributes->has('aria-labelledby')) aria-labelledby="{{ $attributes->get('aria-labelledby') }}" @else aria-label="{{ $attributes->get('aria-label') }}" @endif
+            x-show="open"
+            style="display: none"
+            class="absolute z-40 mt-1 max-h-60 w-full overflow-y-auto rounded-control border border-gray-200 bg-white py-1 shadow-popover dark:border-gray-700 dark:bg-gray-900"
+        >
+            @foreach ($items as $index => $item)
+                <li
+                    id="{{ $field->id }}-option-{{ $index }}"
+                    role="option"
+                    data-value="{{ $item['value'] }}"
+                    x-bind:aria-selected="has(@js($item['value'])) ? 'true' : 'false'"
+                    x-bind:class="active === {{ $index }} ? 'bg-primary-50 dark:bg-gray-800' : ''"
+                    x-on:mousedown.prevent
+                    x-on:mousemove="active = {{ $index }}"
+                    x-on:click="toggle({{ $index }})"
+                    class="flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                >
+                    <span>{{ $item['label'] }}</span>
+                    <x-ui::icon name="fas-check" size="sm" class="text-primary-700 dark:text-primary-400" x-show="has($el.closest('[role=option]').dataset.value)" />
+                </li>
+            @endforeach
+        </ul>
+
+        @if (filled($name))
+            <template x-for="item in selected" x-bind:key="item">
+                <input type="hidden" name="{{ $name }}[]" x-bind:value="item">
+            </template>
+        @endif
+    </div>
+</x-ui::field>
