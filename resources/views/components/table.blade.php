@@ -41,7 +41,7 @@
             const active = document.activeElement
             if (active && active !== document.body && (typeof active.checkVisibility !== 'function' || active.checkVisibility())) return
             this.lastFocused = null
-            this.$el.querySelector('[data-select-page], thead button')?.focus()
+            this.$el.querySelector('[data-select-page]:not(:disabled), thead button')?.focus()
         }
     }"
     x-init="new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(() => recoverFocus(), 50) }).observe($el, { childList: true, subtree: true })"

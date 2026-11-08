@@ -319,3 +319,15 @@ it('returns focus to the page checkbox after a confirmed bulk action removes the
         ->assertScript('document.querySelector("#fruit-last-action").textContent === "Removed: 1"')
         ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
 });
+
+it('returns focus to a sortable header when a confirmed bulk action removes every row on the page', function (): void {
+    $page = visit('/?search=Kiwi');
+
+    $page->click('#fruit-table thead input[type=checkbox]')
+        ->click('Remove selected')
+        ->wait(0.5)
+        ->click('Remove fruit')
+        ->wait(0.8)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").disabled')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead button")');
+});

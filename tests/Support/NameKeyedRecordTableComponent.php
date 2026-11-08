@@ -25,6 +25,19 @@ final class NameKeyedRecordTableComponent extends Component
         return $record->name;
     }
 
+    protected function recordKeyColumn(): ?string
+    {
+        return 'name';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function selectedNames(): array
+    {
+        return $this->selectedRecords(Fruit::query())->orderBy('name')->pluck('name')->all();
+    }
+
     /**
      * @return array<string, string>
      */

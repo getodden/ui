@@ -399,6 +399,27 @@ it('resolves selected keys through the active tab at action time', function (): 
     expect(Fruit::query()->whereIn('id', $component->scopedSelection())->orderBy('name')->pluck('name')->all())->toBe(['Apple', 'Cherry']);
 });
 
+it('resolves selected records through the host key column', function (): void {
+    $component = new NameKeyedRecordTableComponent;
+    $component->selected = ['Apple', 'Cherry', '1'];
+
+    expect($component->selectedNames())->toBe(['Apple', 'Cherry']);
+});
+
+it('applies the active search when resolving selected records', function (): void {
+    $component = new BulkRecordTableComponent;
+    $component->search = 'Ap';
+    $component->selected = fruitIds('Apple', 'Banana', 'Apricot');
+
+    expect(Fruit::query()->whereIn('id', $component->scopedSelection())->orderBy('name')->pluck('name')->all())->toBe(['Apple', 'Apricot']);
+});
+
+it('skips the disabled select-all checkbox when recovering focus', function (): void {
+    $dom = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[]" />');
+
+    expect($dom->querySelector('[data-record-table]')->getAttribute('x-data'))->toContain('[data-select-page]:not(:disabled)');
+});
+
 it('disables the select-all checkbox on a page with no rows', function (): void {
     $empty = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[]" :selectable-keys="[]" />');
     $full = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[1]" :selectable-keys="[\'1\']"><tr><td>1</td><td>x</td></tr></x-ui::table>');

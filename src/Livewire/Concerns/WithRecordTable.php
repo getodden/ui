@@ -485,7 +485,18 @@ trait WithRecordTable
 
         $this->applyRecordTable($query);
 
-        return $query->whereKey($this->selectedKeys());
+        $column = $this->recordKeyColumn();
+
+        if ($column === null) {
+            return $query->whereKey($this->selectedKeys());
+        }
+
+        return $query->whereIn($column, $this->selectedKeys());
+    }
+
+    protected function recordKeyColumn(): ?string
+    {
+        return null;
     }
 
     protected function recordKey(mixed $record): mixed
