@@ -128,7 +128,7 @@ it('moves a card within its column with the down button, sends its place and kee
         ->wait(0.5)
         ->assertScript(boardStatus().' === "Apple moved to Red, position 1 of 3"')
         ->assertScript('document.activeElement.dataset.boardShift === "1"')
-        ->assertScript(lastMove().' === \'{"card":"1","column":"red","position":1,"after":"8"}\'');
+        ->assertScript(lastMove().' === \'{"card":"1","column":"red","position":1,"after":"8","toEnd":false}\'');
 
     expect(Fruit::query()->find(1)->colour)->toBe('red');
 });
@@ -138,7 +138,7 @@ it('sends no card to sit below when a card moves to the top', function (): void 
 
     $page->click('#fruit-board [data-board-card="8"] [data-board-shift="-1"]')
         ->wait(0.5)
-        ->assertScript(lastMove().' === \'{"card":"8","column":"red","position":0,"after":null}\'');
+        ->assertScript(lastMove().' === \'{"card":"8","column":"red","position":0,"after":null,"toEnd":false}\'');
 });
 
 it('sends the card at the end of the shown cards as the one to sit below', function (): void {
@@ -147,7 +147,7 @@ it('sends the card at the end of the shown cards as the one to sit below', funct
     $page->select('#fruit-board [data-board-card="1"] select', 'yellow')
         ->click('#fruit-board [data-board-card="1"] [data-board-confirm]')
         ->wait(0.5)
-        ->assertScript(lastMove().' === \'{"card":"1","column":"yellow","position":3,"after":"28"}\'');
+        ->assertScript(lastMove().' === \'{"card":"1","column":"yellow","position":3,"after":"28","toEnd":false}\'');
 });
 
 it('sends the end position when the target column has more cards than are shown', function (): void {
@@ -156,7 +156,7 @@ it('sends the end position when the target column has more cards than are shown'
     $page->select('#fruit-board [data-board-card="1"] select', 'green')
         ->click('#fruit-board [data-board-card="1"] [data-board-confirm]')
         ->wait(0.5)
-        ->assertScript(lastMove().' === \'{"card":"1","column":"green","position":100000,"after":null}\'');
+        ->assertScript(lastMove().' === \'{"card":"1","column":"green","position":100000,"after":null,"toEnd":true}\'');
 });
 
 it('does nothing when a card is moved inside a column that is not reorderable', function (): void {
@@ -195,4 +195,34 @@ it('shows no drag handle or controls for a viewer who may not move cards', funct
     $page->assertScript('document.querySelectorAll("#fruit-board [data-board-card]").length > 0')
         ->assertScript('document.querySelectorAll("#fruit-board [data-board-card] select, #fruit-board [data-board-card] button").length === 0')
         ->assertScript('document.querySelector("#fruit-board [data-board-card]").getAttribute("draggable") === "false"');
+});
+
+it('does not start a card move from a card that may not move', function (): void {
+    $page = visit('/?viewer=1');
+
+    $page->script('(() => { const card = document.querySelector("#fruit-board [data-board-card]"); const link = document.createElement("a"); link.href = "#"; link.textContent = "open"; card.firstElementChild.append(link); const transfer = new DataTransfer(); link.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer })); document.querySelector("#fruit-board [data-board-list=\'green\']").dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })); return true })()');
+
+    $page->wait(0.5)->assertScript(lastMove().' === "[]"');
+});
+
+it('refuses on the server a move that a viewer sends from the console', function (): void {
+    $page = visit('/?viewer=1');
+
+    $page->script('Livewire.all().find((component) => component.name === "board-demo").$wire.moveCard("1", "green", 0, null); true');
+
+    $page->wait(0.5);
+
+    expect(Fruit::query()->whereKey(1)->value('colour'))->toBe('red');
+});
+
+it('clears the drop highlight when the pointer leaves a column', function (): void {
+    $page = visit('/');
+
+    $page->script('(() => { const card = document.querySelector("#fruit-board [data-board-card]"); const transfer = new DataTransfer(); card.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer })); const green = document.querySelector("#fruit-board [data-board-list=\'green\']"); green.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer })); return true })()');
+
+    $page->assertScript('document.querySelector("#fruit-board [data-board-list=\'green\']").className.includes("bg-primary-50")');
+
+    $page->script('document.querySelector("#fruit-board [data-board-list=\'green\']").dispatchEvent(new DragEvent("dragleave", { bubbles: true, relatedTarget: document.body })); true');
+
+    $page->assertScript('!document.querySelector("#fruit-board [data-board-list=\'green\']").className.includes("bg-primary-50")');
 });

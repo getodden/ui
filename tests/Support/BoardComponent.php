@@ -6,6 +6,8 @@ namespace Odden\Ui\Tests\Support;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Odden\Ui\Livewire\Concerns\WithBoard;
 use Workbench\App\Models\Fruit;
@@ -15,7 +17,7 @@ class BoardComponent extends Component
     use WithBoard;
 
     /**
-     * @var list<array{card: string, column: string, position: int, after: ?string}>
+     * @var list<array{card: string, column: string, position: int, after: ?string, toEnd: bool}>
      */
     public array $moves = [];
 
@@ -33,12 +35,24 @@ class BoardComponent extends Component
         return $this->pageSize;
     }
 
-    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId, bool $toEnd): bool
     {
-        $this->moves[] = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId];
+        $this->moves[] = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId, 'toEnd' => $toEnd];
 
         if ($this->outcome === 'forbid') {
             throw new AuthorizationException;
+        }
+
+        if ($this->outcome === 'abort') {
+            abort(403);
+        }
+
+        if ($this->outcome === 'invalid') {
+            throw ValidationException::withMessages(['stage' => 'No.']);
+        }
+
+        if ($this->outcome === 'broken') {
+            abort(500);
         }
 
         return $this->outcome === 'accept';
@@ -56,6 +70,28 @@ class BoardComponent extends Component
         $this->boardSlice($query, 'red');
 
         return $query->get()->count();
+    }
+
+    /**
+     * @return array{int, int}
+     */
+    public function sliceSizes(): array
+    {
+        return [
+            $this->boardSlice(Fruit::query()->where('colour', 'red')->orderBy('name'), 'red')->records->count(),
+            $this->boardSlice(DB::table('fruits')->where('colour', 'red')->orderBy('name'), 'red')->records->count(),
+        ];
+    }
+
+    /**
+     * @return array{bool, bool}
+     */
+    public function sliceHasMore(): array
+    {
+        return [
+            $this->boardSlice(Fruit::query()->where('colour', 'red')->orderBy('name'), 'red')->hasMore,
+            $this->boardSlice(DB::table('fruits')->where('colour', 'red')->orderBy('name'), 'red')->hasMore,
+        ];
     }
 
     public function render(): string

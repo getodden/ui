@@ -63,7 +63,7 @@
         },
         dragStart(event) {
             const card = event.target.closest?.('[data-board-card]')
-            if (!card || this.pending) {
+            if (!card || event.target !== card || card.getAttribute('draggable') !== 'true' || this.pending) {
                 event.preventDefault()
                 return
             }
@@ -77,7 +77,12 @@
             if (!list) return
             event.preventDefault()
             event.dataTransfer.dropEffect = 'move'
-            this.over = list.dataset.boardList
+            const source = this.cardElement(this.dragging)?.parentElement
+            this.over = source === list && !this.reorderable ? null : list.dataset.boardList
+        },
+        dragLeave(event) {
+            const column = event.target.closest?.('[data-board-column]')
+            if (column && !column.contains(event.relatedTarget)) this.over = null
         },
         drop(event) {
             const card = this.dragging === null ? null : this.cardElement(this.dragging)
@@ -167,6 +172,7 @@
     }"
     x-on:dragstart="dragStart($event)"
     x-on:dragover="dragOver($event)"
+    x-on:dragleave="dragLeave($event)"
     x-on:drop="drop($event)"
     x-on:dragend="dragEnd()"
     x-on:click="click($event)"

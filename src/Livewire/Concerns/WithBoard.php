@@ -9,9 +9,11 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Odden\Ui\Support\BoardSlice;
 use stdClass;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 trait WithBoard
 {
@@ -28,7 +30,7 @@ trait WithBoard
      */
     abstract protected function boardColumnKeys(): array;
 
-    abstract protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool;
+    abstract protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId, bool $toEnd): bool;
 
     protected function boardPageSize(): int
     {
@@ -49,9 +51,15 @@ trait WithBoard
         }
 
         try {
-            return $this->moveBoardCard($cardId, $toColumn, $toPosition, $afterId);
-        } catch (AuthorizationException) {
+            return $this->moveBoardCard($cardId, $toColumn, $toPosition, $afterId, $toPosition === BoardSlice::END_POSITION);
+        } catch (AuthorizationException|ValidationException) {
             return false;
+        } catch (HttpExceptionInterface $exception) {
+            if (in_array($exception->getStatusCode(), [401, 403], true)) {
+                return false;
+            }
+
+            throw $exception;
         }
     }
 

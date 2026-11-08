@@ -15,14 +15,14 @@ it('hands the card, column and position to the host write method', function (): 
     $component = Livewire::test(BoardComponent::class)->call('moveCard', 3, 'green', 1)->assertReturned(true)->call('moveCard', '4', 'red', '0')->assertReturned(true);
 
     expect($component->get('moves'))->toBe([
-        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => null],
-        ['card' => '4', 'column' => 'red', 'position' => 0, 'after' => null],
+        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => null, 'toEnd' => false],
+        ['card' => '4', 'column' => 'red', 'position' => 0, 'after' => null, 'toEnd' => false],
     ]);
 });
 
 it('returns true when the host accepts and false when it refuses', function (string $outcome, bool $expected): void {
     Livewire::test(BoardComponent::class)->set('outcome', $outcome)->call('moveCard', '1', 'red', 0)->assertReturned($expected);
-})->with([['accept', true], ['refuse', false], ['forbid', false]]);
+})->with([['accept', true], ['refuse', false], ['forbid', false], ['abort', false], ['invalid', false]]);
 
 it('never calls the host for a column that is not on the board', function (mixed $column): void {
     $component = Livewire::test(BoardComponent::class)->call('moveCard', '1', $column, 0)->assertReturned(false);
@@ -50,8 +50,8 @@ it('hands the neighbour the card now sits below to the host', function (): void 
     $component = Livewire::test(BoardComponent::class)->call('moveCard', '3', 'green', 1, '7')->assertReturned(true)->call('moveCard', '3', 'green', 0, 7)->assertReturned(true);
 
     expect($component->get('moves'))->toBe([
-        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => '7'],
-        ['card' => '3', 'column' => 'green', 'position' => 0, 'after' => '7'],
+        ['card' => '3', 'column' => 'green', 'position' => 1, 'after' => '7', 'toEnd' => false],
+        ['card' => '3', 'column' => 'green', 'position' => 0, 'after' => '7', 'toEnd' => false],
     ]);
 });
 
@@ -125,4 +125,24 @@ it('offers every other column in the move to select and not the card\'s own', fu
 
     expect($values)->toBe(['', 'green', 'yellow'])
         ->and($select->getAttribute('aria-label'))->toStartWith('Move ');
+});
+
+it('tells the host apart a move to the top from a move to the end of the column', function (): void {
+    $component = Livewire::test(BoardComponent::class)
+        ->call('moveCard', '1', 'green', 0, null)
+        ->call('moveCard', '1', 'green', 100000, null)
+        ->call('moveCard', '1', 'green', 99999, null);
+
+    expect(array_column($component->get('moves'), 'toEnd'))->toBe([false, true, false]);
+});
+
+it('slices a query builder and an eloquent builder the same way', function (): void {
+    $component = Livewire::test(BoardComponent::class);
+
+    expect($component->instance()->sliceSizes())->toBe([2, 2])
+        ->and($component->instance()->sliceHasMore())->toBe([true, true]);
+});
+
+it('lets a server error other than a refusal through', function (): void {
+    Livewire::test(BoardComponent::class)->set('outcome', 'broken')->call('moveCard', '1', 'red', 0)->assertStatus(500);
 });

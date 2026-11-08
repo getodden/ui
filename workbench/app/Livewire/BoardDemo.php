@@ -37,9 +37,13 @@ final class BoardDemo extends Component
         return 3;
     }
 
-    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId, bool $toEnd): bool
     {
-        $this->lastMove = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId];
+        $this->lastMove = ['card' => $cardId, 'column' => $toColumn, 'position' => $position, 'after' => $afterCardId, 'toEnd' => $toEnd];
+
+        if ($this->viewer) {
+            return false;
+        }
 
         if ($toColumn === 'purple') {
             return false;
