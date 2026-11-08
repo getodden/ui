@@ -291,6 +291,7 @@ it('exposes the sort state for the table header', function (): void {
         'tab' => null,
         'selectedCount' => 0,
         'bulkActions' => [],
+        'dangerousBulkActions' => [],
     ]);
 });
 

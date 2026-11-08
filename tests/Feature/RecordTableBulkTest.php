@@ -9,6 +9,7 @@ use Odden\Ui\Livewire\Concerns\WithRecordTable;
 use Odden\Ui\Support\RecordTableReads;
 use Odden\Ui\Tests\Support\BulkRecordTableComponent;
 use Odden\Ui\Tests\Support\Html;
+use Odden\Ui\Tests\Support\OwnConfirmingFlagRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
 use Odden\Ui\Tests\Support\WideRecordTableComponent;
 use Workbench\App\Models\Fruit;
@@ -71,7 +72,7 @@ it('marks the active tab with aria-current and renders every tab as a button', f
 
     $buttons = $dom->querySelectorAll('nav button');
 
-    expect($buttons)->toHaveCount(3)
+    expect($buttons)->toHaveCount(4)
         ->and($buttons[0]->hasAttribute('aria-current'))->toBeFalse()
         ->and($buttons[1]->getAttribute('aria-current'))->toBe('true');
 });
@@ -117,7 +118,7 @@ it('cleans untrusted selections before a bulk action sees them', function (): vo
         ->set('selected', ['1', 1, '1', '', null, ['2'], 2.0, new stdClass, str_repeat('x', 300), "bad\xff"])
         ->call('runBulkAction', 'recordSelection');
 
-    expect($component->get('received'))->toBe(['1', '2', 'bad?']);
+    expect($component->get('received'))->toBe(['1', '2']);
 });
 
 it('ignores a selection that is not a list', function (mixed $value): void {
@@ -195,9 +196,9 @@ it('renders a row menu with a labelled trigger and menu items', function (): voi
 
     expect($trigger->getAttribute('aria-label'))->toBe('Actions for Apple')
         ->and($menu->getAttribute('aria-label'))->toBe('Actions for Apple')
-        ->and($items)->toHaveCount(2)
+        ->and($items)->toHaveCount(3)
         ->and($items[0]->getAttribute('tabindex'))->toBe('-1')
-        ->and($items[1]->classList->contains('text-rose-700'))->toBeTrue();
+        ->and($items[2]->classList->contains('text-rose-700'))->toBeTrue();
 });
 
 it('adds the selection and actions columns to the empty row span', function (): void {
@@ -281,6 +282,60 @@ it('accepts a collection of selectable keys', function (): void {
 it('lets the bulk buttons restore focus to the page checkbox once the bar disappears', function (): void {
     $dom = Html::parse(Livewire::test(BulkRecordTableComponent::class)->set('selected', fruitIds('Apple'))->html());
 
-    expect($dom->querySelector('thead input[type=checkbox]')->getAttribute('x-ref'))->toBe('selectPage')
-        ->and($dom->querySelector('[role=group] button')->getAttribute('x-on:click'))->toContain('restoreFocus');
+    expect($dom->querySelector('thead input[type=checkbox]')->hasAttribute('data-select-page'))->toBeTrue()
+        ->and($dom->querySelector('[role=group] button')->getAttribute('x-on:click'))->toContain('[data-select-page]')
+        ->and($dom->querySelector('div[data-record-table]')->hasAttribute('x-data'))->toBeFalse();
+});
+
+it('drops selected rows that have left the current page', function (): void {
+    $ids = fruitIds('Apple', 'Apricot');
+    $component = Livewire::test(BulkRecordTableComponent::class)->set('selected', $ids);
+
+    Fruit::query()->whereKey($ids[0])->delete();
+    $component->call('$refresh');
+
+    expect($component->get('selected'))->toBe([$ids[1]]);
+
+    $component->call('runBulkAction', 'recordSelection');
+
+    expect($component->get('received'))->toBe([$ids[1]]);
+});
+
+it('drops selected rows that the active tab does not show', function (): void {
+    $ids = fruitIds('Apple', 'Banana');
+    $component = Livewire::test(BulkRecordTableComponent::class)->call('setTab', 'red')->set('selected', $ids);
+
+    expect($component->get('selected'))->toBe([$ids[0]]);
+});
+
+it('groups a tab scope so its or conditions cannot escape the search', function (): void {
+    $component = Livewire::test(BulkRecordTableComponent::class)->call('setTab', 'loose')->set('search', 'Apple');
+
+    $component->assertSee('Apple')->assertDontSee('Raspberry')->assertDontSee('Date');
+});
+
+it('keeps the selection after a bulk action only when the component uses WithConfirmation', function (): void {
+    $ids = fruitIds('Apple');
+    $component = Livewire::test(OwnConfirmingFlagRecordTableComponent::class)->set('selected', $ids)->call('runBulkAction', 'recordSelection');
+
+    expect($component->get('received'))->toBe($ids)
+        ->and($component->get('selected'))->toBe([]);
+});
+
+it('clears the selection on a page change even when the host defines updatedPaginators', function (): void {
+    $component = Livewire::test(OwnConfirmingFlagRecordTableComponent::class)->set('selected', fruitIds('Apple'))->call('nextPage');
+
+    expect($component->get('selected'))->toBe([])
+        ->and($component->get('received'))->toBe(['scrolled']);
+});
+
+it('styles dangerous bulk actions as danger and renders link row actions as anchors', function (): void {
+    $dom = Html::parse(Livewire::test(BulkRecordTableComponent::class)->set('selected', fruitIds('Apple'))->html());
+
+    $buttons = $dom->querySelectorAll('[role=group] button');
+    $link = $dom->querySelector('tbody tr a[role=menuitem]');
+
+    expect($buttons[2]->textContent)->toContain('Remove')
+        ->and($buttons[2]->className)->not->toBe($buttons[0]->className)
+        ->and($link->getAttribute('href'))->toStartWith('/fruit/');
 });

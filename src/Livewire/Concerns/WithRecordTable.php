@@ -7,6 +7,7 @@ namespace Odden\Ui\Livewire\Concerns;
 use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
@@ -16,7 +17,9 @@ use ReflectionMethod;
 
 trait WithRecordTable
 {
-    use WithPagination;
+    use WithPagination {
+        setPage as private setPageKeepingSelection;
+    }
 
     #[Url(except: '')]
     public mixed $search = '';
@@ -86,6 +89,14 @@ trait WithRecordTable
      * @return array<string, string>
      */
     protected function bulkActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dangerousBulkActions(): array
     {
         return [];
     }
@@ -160,6 +171,17 @@ trait WithRecordTable
         $this->resetPage();
     }
 
+    /**
+     * @param  int|string  $page
+     * @param  string  $pageName
+     * @return void
+     */
+    public function setPage($page, $pageName = 'page')
+    {
+        $this->clearSelection();
+        $this->setPageKeepingSelection($page, $pageName);
+    }
+
     public function clearSelection(): void
     {
         $this->selected = [];
@@ -190,7 +212,9 @@ trait WithRecordTable
 
     private function awaitingConfirmation(): bool
     {
-        return property_exists($this, 'confirming') && $this->confirming === true;
+        return in_array(WithConfirmation::class, class_uses_recursive($this), true)
+            && property_exists($this, 'confirming')
+            && $this->confirming === true;
     }
 
     protected function recordTableState(): RecordTableState
@@ -205,6 +229,7 @@ trait WithRecordTable
             $this->activeTabIn($tabs),
             count($this->selectedKeys()),
             $this->bulkActions(),
+            $this->dangerousBulkActions(),
         );
     }
 
@@ -372,7 +397,7 @@ trait WithRecordTable
         $tab = $this->activeTabIn($tabs);
 
         if ($tab !== null) {
-            $tabs[$tab]['scope']($query);
+            $query->where(fn (EloquentBuilder|QueryBuilder $group): mixed => $tabs[$tab]['scope']($group));
         }
 
         if ($sort !== null) {
@@ -420,7 +445,29 @@ trait WithRecordTable
             $records = $query->paginate($perPage);
         }
 
+        $this->keepSelectionOn($records);
+
         return $records;
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, mixed>  $records
+     */
+    private function keepSelectionOn(LengthAwarePaginator $records): void
+    {
+        $pageKeys = [];
+
+        foreach ($records->items() as $record) {
+            $key = $record instanceof Model ? $record->getKey() : data_get($record, 'id');
+
+            if (! is_int($key) && ! is_string($key)) {
+                return;
+            }
+
+            $pageKeys[] = (string) $key;
+        }
+
+        $this->selected = array_values(array_intersect($this->selectedKeys(), $pageKeys));
     }
 
     /**
@@ -471,14 +518,17 @@ trait WithRecordTable
         $this->selected = $this->selectedKeys();
     }
 
-    public function updatedPaginators(): void
-    {
-        $this->clearSelection();
-    }
-
     public function updatedWithRecordTable(string $name): void
     {
-        if (in_array(explode('.', $name)[0], ['search', 'sort', 'direction', 'filters', 'perPage', 'tab'], true)) {
+        $property = explode('.', $name)[0];
+
+        if ($property === 'paginators') {
+            $this->clearSelection();
+
+            return;
+        }
+
+        if (in_array($property, ['search', 'sort', 'direction', 'filters', 'perPage', 'tab'], true)) {
             $this->clearSelection();
             $this->resetPage();
         }

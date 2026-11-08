@@ -288,6 +288,7 @@ Pass `:selectable-keys="$contacts->pluck('id')"` to add a selection column with 
 ```blade
 <x-ui::table.actions :label="'Actions for '.$contact->name">
     <x-ui::table.action wire:click="edit({{ $contact->id }})">Edit</x-ui::table.action>
+    <x-ui::table.action :href="route('contacts.show', $contact)">Open</x-ui::table.action>
     <x-ui::table.action danger wire:click="confirmDelete({{ $contact->id }})">Delete</x-ui::table.action>
 </x-ui::table.actions>
 ```
@@ -343,7 +344,7 @@ protected function recordTabs(): array
 }
 ```
 
-Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. Load them through your own scoped query and authorise every record before changing it.
+Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. After each render the selection keeps only the keys of the rows on the current page. List the methods that should look destructive in `dangerousBulkActions()` and their buttons use the danger style. Load them through your own scoped query and authorise every record before changing it.
 
 ```php
 protected function bulkActions(): array

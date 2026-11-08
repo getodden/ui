@@ -227,3 +227,81 @@ it('opens the row menu from the keyboard, moves with arrows and closes with Esca
         ->keys(':focus', 'Enter')
         ->assertSee('Inspected: Apple');
 });
+
+function firstTrigger(): string
+{
+    return 'document.querySelector("#fruit-table tbody tr:first-child button[aria-haspopup=menu]")';
+}
+
+it('opens on the last item with ArrowUp, jumps with Home and End, and closes on Tab', function (): void {
+    $page = visit('/');
+
+    $page->script(firstTrigger().'.focus()');
+
+    $page->keys(':focus', 'ArrowUp')
+        ->wait(0.3)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
+        ->keys(':focus', 'Home')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]")')
+        ->keys(':focus', 'End')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
+        ->keys(':focus', 'Tab')
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"');
+});
+
+it('closes the row menu on a click outside', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:first-child button[aria-haspopup=menu]')
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "true"')
+        ->script('document.querySelector("#fruit-table tbody tr:nth-child(3) th").click()');
+
+    $page
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"');
+});
+
+it('closes the row menu on scroll and moves focus back only when it was inside the menu', function (): void {
+    $page = visit('/');
+
+    $page->script(firstTrigger().'.focus()');
+    $page->keys(':focus', 'Enter')
+        ->wait(0.5)
+        ->assertScript('document.activeElement.getAttribute("role") === "menuitem"')
+        ->script('window.dispatchEvent(new Event("scroll"))');
+
+    $page->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"')
+        ->assertScript('document.activeElement === '.firstTrigger());
+
+    $page->script(firstTrigger().'.click()');
+    $page->wait(0.5);
+    $page->script('document.activeElement.blur(); window.dispatchEvent(new Event("scroll"))');
+
+    $page->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"')
+        ->assertScript('document.activeElement !== '.firstTrigger());
+});
+
+it('opens the row menu above the trigger when there is no room below', function (): void {
+    $page = visit('/');
+
+    $page->script('document.body.style.paddingBottom = "2000px"; const row = document.querySelector("#fruit-table tbody tr:last-child"); window.scrollTo(0, row.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 4)');
+    $page->wait(0.5);
+    $page->script('document.querySelector("#fruit-table tbody tr:last-child button[aria-haspopup=menu]").click()');
+
+    $page->wait(0.5)
+        ->assertScript('(() => { const trigger = document.querySelector("#fruit-table tbody tr:last-child button[aria-haspopup=menu]").getBoundingClientRect(); const menu = document.querySelector("#fruit-table tbody tr:last-child [role=menu]").getBoundingClientRect(); return menu.bottom <= trigger.top + 1 })()');
+});
+
+it('keeps the page checkbox in step with the page rows and focuses it after clearing the selection', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:first-child input[type=checkbox]')
+        ->wait(0.5)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").indeterminate === true');
+
+    $page->script('const box = document.querySelector("#fruit-table thead input[type=checkbox]"); box.setAttribute("data-keys", JSON.stringify(JSON.parse(box.dataset.keys).slice(1)))');
+
+    $page->wait(0.5)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").indeterminate === false')
+        ->click('Clear selection')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});

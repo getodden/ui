@@ -35,9 +35,25 @@ class BulkRecordTableComponent extends Component
         return ['name' => 'name'];
     }
 
+    /**
+     * @return list<string>
+     */
+    protected function searchableColumns(): array
+    {
+        return ['name'];
+    }
+
     protected function defaultSort(): string
     {
         return 'name';
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dangerousBulkActions(): array
+    {
+        return ['askToRemove'];
     }
 
     protected function maximumSelection(): int
@@ -55,6 +71,7 @@ class BulkRecordTableComponent extends Component
         return [
             'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query],
             'red' => ['label' => 'Red', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('colour', 'red')],
+            'loose' => ['label' => 'Loose', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('colour', 'red')->orWhere('price', '>=', 500)],
             'pricey' => ['label' => 'Pricey', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('price', '>=', 500)],
         ];
     }
@@ -126,6 +143,7 @@ class BulkRecordTableComponent extends Component
                         <td>
                             <x-ui::table.actions :label="'Actions for '.$fruit->name">
                                 <x-ui::table.action wire:click="unlistedAction">Open</x-ui::table.action>
+                                <x-ui::table.action href="/fruit/{{ $fruit->id }}">Show</x-ui::table.action>
                                 <x-ui::table.action danger>Remove</x-ui::table.action>
                             </x-ui::table.actions>
                         </td>
