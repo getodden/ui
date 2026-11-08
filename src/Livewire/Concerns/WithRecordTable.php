@@ -7,14 +7,20 @@ namespace Odden\Ui\Livewire\Concerns;
 use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
+use LogicException;
 use Odden\Ui\Support\RecordTableState;
+use ReflectionMethod;
 
 trait WithRecordTable
 {
     use WithPagination;
+
+    private bool $recordsPaginated = false;
 
     #[Url(except: '')]
     public mixed $search = '';
@@ -30,6 +36,11 @@ trait WithRecordTable
 
     #[Url(except: 10)]
     public mixed $perPage = 10;
+
+    #[Url(except: '')]
+    public mixed $tab = '';
+
+    public mixed $selected = [];
 
     /**
      * @return array<string, string|Closure(EloquentBuilder<*>|QueryBuilder, string): void>
@@ -60,6 +71,40 @@ trait WithRecordTable
     protected function recordFilters(): array
     {
         return [];
+    }
+
+    /**
+     * @return array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>
+     */
+    protected function recordTabs(): array
+    {
+        return [];
+    }
+
+    protected function defaultTab(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function bulkActions(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dangerousBulkActions(): array
+    {
+        return [];
+    }
+
+    protected function maximumSelection(): int
+    {
+        return max([100, ...$this->perPageOptions()]);
     }
 
     /**
@@ -106,22 +151,152 @@ trait WithRecordTable
             $this->direction = 'asc';
         }
 
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function resetFilters(): void
     {
         $this->filters = [];
+        $this->clearSelection();
         $this->resetPage();
+    }
+
+    public function setTab(string $key): void
+    {
+        $tabs = $this->recordTabs();
+
+        if (! array_key_exists($key, $tabs)) {
+            return;
+        }
+
+        $this->tab = $key === $this->resolveDefaultTab($tabs) ? '' : $key;
+        $this->clearSelection();
+        $this->resetPage();
+    }
+
+    public function clearSelection(): void
+    {
+        $this->selected = [];
+    }
+
+    public function runBulkAction(string $action): void
+    {
+        if (! array_key_exists($action, $this->bulkActions()) || ! method_exists($this, $action)) {
+            return;
+        }
+
+        if ((new ReflectionMethod($this, $action))->isPublic()) {
+            throw new LogicException("Bulk action [{$action}] must be protected.");
+        }
+
+        $keys = $this->selectedKeys();
+
+        if ($keys === []) {
+            return;
+        }
+
+        if ($this->pendingConfirmation() !== []) {
+            return;
+        }
+
+        $this->{$action}($keys);
+
+        if ($this->pendingConfirmation() === []) {
+            $this->clearSelection();
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function pendingConfirmation(): array
+    {
+        return in_array(WithConfirmation::class, class_uses_recursive($this), true) ? $this->confirmation : [];
     }
 
     protected function recordTableState(): RecordTableState
     {
+        throw_unless($this->recordsPaginated, LogicException::class, 'Call paginateRecords() before recordTableState().');
+
+        $tabs = $this->recordTabs();
+
         return new RecordTableState(
             array_map(strval(...), array_keys($this->sortableColumns())),
             $this->activeSort(),
             $this->activeDirection(),
+            array_map(fn (array $tab): string => $tab['label'], $tabs),
+            $this->activeTabIn($tabs),
+            count($this->selectedKeys()),
+            $this->bulkActions(),
+            $this->dangerousBulkActions(),
         );
+    }
+
+    protected function activeTab(): ?string
+    {
+        return $this->activeTabIn($this->recordTabs());
+    }
+
+    /**
+     * @param  array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>  $tabs
+     */
+    private function activeTabIn(array $tabs): ?string
+    {
+        if ($tabs === []) {
+            return null;
+        }
+
+        $requested = $this->scalarState($this->tab);
+
+        if ($requested !== '' && array_key_exists($requested, $tabs)) {
+            return $requested;
+        }
+
+        return $this->resolveDefaultTab($tabs);
+    }
+
+    /**
+     * @param  array<string, array{label: string, scope: Closure(EloquentBuilder<*>|QueryBuilder): mixed}>  $tabs
+     */
+    private function resolveDefaultTab(array $tabs): ?string
+    {
+        $default = $this->defaultTab();
+
+        if ($default !== null && array_key_exists($default, $tabs)) {
+            return $default;
+        }
+
+        $first = array_key_first($tabs);
+
+        return $first === null ? null : (string) $first;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function selectedKeys(): array
+    {
+        if (! is_array($this->selected)) {
+            return [];
+        }
+
+        $keys = [];
+        $limit = max(0, $this->maximumSelection());
+
+        foreach ($this->selected as $value) {
+            if (count($keys) >= $limit) {
+                break;
+            }
+
+            $key = $this->scalarState($value);
+
+            if ($key !== '' && mb_strlen($key) <= 255) {
+                $keys[$key] = true;
+            }
+        }
+
+        return array_map(strval(...), array_keys($keys));
     }
 
     protected function activeSort(): ?string
@@ -218,6 +393,16 @@ trait WithRecordTable
             $filters[$key]($query, $value);
         }
 
+        $tabs = $this->recordTabs();
+        $tab = $this->activeTabIn($tabs);
+
+        if ($tab !== null) {
+            $query->where(function (EloquentBuilder|QueryBuilder $group) use ($tabs, $tab): void {
+                $tabs[$tab]['scope']($group);
+                $this->assertOnlyWheres($group, $tab);
+            });
+        }
+
         if ($sort !== null) {
             $this->orderUsing($query, $this->sortableColumns()[$sort], $this->activeDirection());
         }
@@ -227,6 +412,33 @@ trait WithRecordTable
         if ($tiebreak !== null) {
             $query->orderBy($tiebreak);
         }
+    }
+
+    /**
+     * @param  EloquentBuilder<*>|QueryBuilder  $group
+     */
+    private function assertOnlyWheres(EloquentBuilder|QueryBuilder $group, string $tab): void
+    {
+        $base = $group instanceof EloquentBuilder ? $group->getQuery() : $group;
+
+        $addsMore = ($base->joins ?? []) !== []
+            || ($base->orders ?? []) !== []
+            || ($base->groups ?? []) !== []
+            || ($base->havings ?? []) !== []
+            || ($base->unions ?? []) !== []
+            || $base->columns !== null
+            || $base->limit !== null
+            || $base->offset !== null
+            || $base->lock !== null
+            || $base->distinct !== false;
+
+        $removedScopes = $group instanceof EloquentBuilder ? $group->removedScopes() : [];
+
+        throw_if(
+            $addsMore || array_diff($removedScopes, [SoftDeletingScope::class]) !== [],
+            LogicException::class,
+            "Tab [{$tab}] may only add where clauses.",
+        );
     }
 
     /**
@@ -263,7 +475,65 @@ trait WithRecordTable
             $records = $query->paginate($perPage);
         }
 
+        $this->keepSelectionOn($records);
+        $this->recordsPaginated = true;
+
         return $records;
+    }
+
+    /**
+     * @param  EloquentBuilder<*>  $base
+     * @return EloquentBuilder<*>
+     */
+    protected function selectedRecords(EloquentBuilder $base): EloquentBuilder
+    {
+        $query = clone $base;
+
+        $this->applyRecordTable($query);
+
+        $column = $this->recordKeyColumn();
+
+        if ($column !== null) {
+            return $query->whereIn($column, $this->selectedKeys());
+        }
+
+        $keys = $this->selectedKeys();
+
+        if ($query->getModel()->getKeyType() === 'int') {
+            $keys = array_values(array_filter($keys, ctype_digit(...)));
+        }
+
+        return $query->whereKey($keys);
+    }
+
+    protected function recordKeyColumn(): ?string
+    {
+        return null;
+    }
+
+    protected function recordKey(mixed $record): mixed
+    {
+        return $record instanceof Model ? $record->getKey() : data_get($record, 'id');
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, mixed>  $records
+     */
+    private function keepSelectionOn(LengthAwarePaginator $records): void
+    {
+        $pageKeys = [];
+
+        foreach ($records->items() as $record) {
+            $key = $this->recordKey($record);
+
+            if (! is_int($key) && ! is_string($key)) {
+                return;
+            }
+
+            $pageKeys[] = (string) $key;
+        }
+
+        $this->selected = array_values(array_intersect($this->selectedKeys(), $pageKeys));
     }
 
     /**
@@ -310,11 +580,22 @@ trait WithRecordTable
         $this->direction = $this->scrubbedState($this->direction);
         $this->filters = $this->scrubbedState($this->filters);
         $this->perPage = $this->scrubbedState($this->perPage);
+        $this->tab = $this->scrubbedState($this->tab);
+        $this->selected = $this->selectedKeys();
     }
 
     public function updatedWithRecordTable(string $name): void
     {
-        if (in_array(explode('.', $name)[0], ['search', 'sort', 'direction', 'filters', 'perPage'], true)) {
+        $property = explode('.', $name)[0];
+
+        if ($property === 'paginators') {
+            $this->clearSelection();
+
+            return;
+        }
+
+        if (in_array($property, ['search', 'sort', 'direction', 'filters', 'perPage', 'tab'], true)) {
+            $this->clearSelection();
             $this->resetPage();
         }
     }

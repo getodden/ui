@@ -66,7 +66,7 @@ All components are anonymous Blade components under the `ui` prefix. Extra attri
 | `<x-ui::stat>` | `label` (required), `value`, `delta`, `direction` up, down or flat, `sentiment` positive, negative or neutral, `delta-label`, `sparkline` (list of values) |
 | `<x-ui::repeater>` | `label` (required), `name` (the array property, required), `rows` (that property), `item-label` (default "Item"), `add-label`, `hint`, `error`; rows go in the slot |
 | `<x-ui::repeater.row>` | `index` (required); the row's fields go in the slot |
-| `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`; `toolbar` and `empty` slots |
+| `<x-ui::table>` | `caption` (required unless you pass `aria-label` or `aria-labelledby`), `caption-visible`, `columns`, `state`, `records`, `selectable-keys`, `row-actions`; `toolbar` and `empty` slots |
 
 Components that take an `icon` accept a Blade FontAwesome name as a string, or a named `icon` slot rendered as given.
 
@@ -281,6 +281,20 @@ The label is the accessible name (a `figcaption` the SVG is labelled by) and is 
 
 Series and segments take their colours in order from `--ui-chart-1` to `--ui-chart-6`, which `theme.css` defines for light and dark; override them to rebrand, and override both the `:root` and the `.dark` declarations, or the dark palette keeps the package colours (or the later `:root` rule wins in dark mode too when `.dark` sits on `<html>`). Colour is never the only carrier: every mark has a tooltip and a row in the table, and the legend names each series. A stat's `direction` is inferred from a leading `+` or `-` in `delta`, from the sign of a numeric one, or from a zero, when you do not pass it (otherwise the tile states no direction), and its colour follows `sentiment` (up is positive, down negative, unless you say otherwise, for example for churn). A donut with more than six segments folds the tail into "Other", and values beyond 1e15 in magnitude are ignored and values below 1e-9 in magnitude count as zero.
 
+Pass `:selectable-keys="$contacts->pluck('id')->all()"` to add a selection column with a select-all-on-page checkbox, and put `<x-ui::table.select :value="$contact->id" label="Select {{ $contact->name }}" />` in each row. Pass `row-actions` for a trailing column and put a menu in it:
+
+Pass `:selectable-keys="$contacts->pluck('id')"` to add a selection column with a select-all-on-page checkbox, and put `<x-ui::table.select :value="$contact->id" :label="'Select '.$contact->name" />` in each row. Pass `row-actions` for a trailing column and put a menu in it:
+
+```blade
+<x-ui::table.actions :label="'Actions for '.$contact->name">
+    <x-ui::table.action wire:click="edit({{ \Illuminate\Support\Js::from($contact->id) }})">Edit</x-ui::table.action>
+    <x-ui::table.action :href="route('contacts.show', $contact)">Open</x-ui::table.action>
+    <x-ui::table.action danger wire:click="confirmDelete({{ \Illuminate\Support\Js::from($contact->id) }})">Delete</x-ui::table.action>
+</x-ui::table.actions>
+```
+
+The menu button opens with Enter, Space or the arrow keys; arrows, Home and End move between items, Escape closes it and returns focus to the button. It opens above the button when there is no room below, and it closes when the page scrolls. When the state has tabs, they render as buttons above the table, and the active one carries `aria-current`.
+
 ## Livewire traits
 
 `WithRecordTable` holds search, sort, filters, per-page and pagination state in the URL. Every key comes from your allow-lists and is checked each time it is used, so a value from the URL or `$wire.$set` that is not on a list falls back to the default.
@@ -317,6 +331,41 @@ class Contacts extends Component
 A filter closure receives the raw string from the request, so validate it there. Override `defaultSort()`, `defaultDirection()`, `perPageOptions()` or `applySearch()` when you need to.
 
 A chosen sort replaces any order on your base query, and the model key always breaks ties, so pages stay stable. Search compares `lower(column) like lower(term)`. On PostgreSQL that fails for columns that are not text, such as integers, uuids and json, so search those in your own `applySearch()`. On SQLite only ASCII letters match regardless of case. A page past the end shows the last page.
+
+Tabs are named scopes. Declare them with `recordTabs()`; the first one is the default unless you override `defaultTab()`. The active tab is kept in the URL (`tab`), and a value that is not a key falls back to the default. A tab scope may only add where clauses; one that adds a join, order, group, having, union or column list throws a `LogicException`, so put those on the base query.
+
+```php
+protected function recordTabs(): array
+{
+    return [
+        'all' => ['label' => 'All', 'scope' => fn (Builder $query) => $query],
+        'open' => ['label' => 'Open', 'scope' => fn (Builder $query) => $query->where('status', Status::Open)],
+    ];
+}
+```
+
+Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. After each render the selection keeps only the keys of the rows on the current page; the key is the model key (or the `id` field of a plain row), and a host that keys its checkboxes by something else overrides `recordKey($record)` and `recordKeyColumn()`, so `selectedRecords()` matches the selected keys against that column instead of the primary key. Call `paginateRecords()` before `recordTableState()`, which throws otherwise. List the methods that should look destructive in `dangerousBulkActions()` and their buttons use the danger style. To act on the rows the visitor sees, build the query with `selectedRecords(Model::query())`, which applies the active search, filters and tab and keeps only the selected model keys (on an integer-keyed model, keys that are not digits are dropped, so a host that keys its checkboxes by something else must override `recordKeyColumn()` too). Load them through your own scoped query and authorise every record before changing it.
+
+```php
+protected function bulkActions(): array
+{
+    return ['archiveSelected' => 'Archive'];
+}
+
+protected function archiveSelected(array $keys): void
+{
+    foreach ($this->selectedRecords(Contact::query())->get() as $contact) {
+        $this->authorize('archive', $contact);
+        app(ArchiveContact::class)->handle($contact);
+    }
+}
+```
+
+Pass labels as `:label` with a PHP expression, as above, because Blade already escapes `{{ }}` inside an attribute and the component escapes it again. `maximumSelection()` defaults to the largest of 100 and your `perPageOptions()`, so selecting a whole page is never cut short.
+
+The selection is cleared after a bulk action succeeds, and whenever the page, search, sort, filters, per-page or tab changes. If the action throws, the selection stays. If it calls `confirm()` from `WithConfirmation`, the selection also stays while the dialog is open and after Cancel; call `clearSelection()` in the confirmed method. When the element that held focus leaves the table, including after a confirmation dialog closes, focus moves to the select-all checkbox.
+
+A write guard that denies public Livewire methods by default can allow the trait's own pure reads from `Odden\Ui\Support\RecordTableReads::METHODS`: `sortBy`, `resetFilters`, `setTab`, `clearSelection`, `gotoPage`, `nextPage`, `previousPage`, `setPage` and `resetPage`. `runBulkAction` is not on the list, because it runs your methods.
 
 `WithToasts` adds `toast($message, ToastVariant::Success)`, which shows a toast now, and `toastAfterRedirect(...)`, which flashes it to the session for the next page. Danger toasts stay until dismissed; the others leave after five seconds, and hovering or focusing the toasts holds them.
 
@@ -355,11 +404,11 @@ class Contacts extends Component
 - Control borders (inputs, selects, textareas, outline buttons) meet the 3:1 non-text contrast of WCAG 1.4.11. A disabled link button has no `href` and no click handlers.
 - Icon-only buttons need a `label`. Icons are `aria-hidden`.
 - The editor's toolbar is one tab stop with arrow-key movement and `aria-pressed` on toggles; the editable area is a labelled `textbox`, and mention suggestions are a `listbox` it points at with `aria-activedescendant`.
-- Table headers are column headers, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
 - The repeater is a labelled group with an ordered list of labelled row groups. Each row has move up, move down and remove buttons named after the row, disabled at the ends and at the minimum; moving, adding and removing announce the result and keep focus in the list. The drag handle is hidden from assistive technology because the buttons do the same job.
 - The board is a group of labelled column sections. Each card has a labelled Move to select, so a move never needs a pointer, and a polite status region announces each move or refusal. The board is `aria-busy` while a move is saved.
 - Radio groups are fieldsets with a legend; the multiselect and combobox expose `role=combobox` with `aria-expanded`, `aria-controls` and `aria-activedescendant`, and the combobox announces the result count in a status region.
 - Tabs follow the ARIA tabs pattern with one tab stop and arrow-key movement; the dropdown follows the menu-button pattern; the collapsible heading holds a button with `aria-expanded` and `aria-controls`; breadcrumbs sit in a labelled `nav` with `aria-current="page"` on the last.
+- Table headers are column headers, row checkboxes and the select-all checkbox are labelled, the status region announces how many rows are selected, the row menu follows the menu-button pattern with arrow-key movement, the sorted one carries `aria-sort`, the table is `aria-busy` while its own requests run, and a status region announces loading and the result count. The current page stays focusable.
 
 ## Development
 

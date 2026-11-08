@@ -36,6 +36,12 @@ return [
         'next' => 'Next',
         'page' => 'Page',
         'go_to_page' => 'Go to page :page',
+        'tabs' => 'Views',
+        'select_page' => 'Select all rows on this page',
+        'selected' => '{0} No rows selected|{1} :count row selected|[2,*] :count rows selected',
+        'bulk_actions' => 'Actions for selected rows',
+        'clear_selection' => 'Clear selection',
+        'row_actions' => 'Actions',
     ],
     'board' => [
         'empty' => 'No cards',

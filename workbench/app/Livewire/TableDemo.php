@@ -9,11 +9,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Component;
+use Odden\Ui\Livewire\Concerns\WithConfirmation;
 use Odden\Ui\Livewire\Concerns\WithRecordTable;
 use Workbench\App\Models\Fruit;
 
 final class TableDemo extends Component
 {
+    use WithConfirmation;
     use WithRecordTable;
 
     /**
@@ -58,6 +60,67 @@ final class TableDemo extends Component
     }
 
     public int $unrelated = 0;
+
+    public string $lastAction = '';
+
+    /**
+     * @return array<string, array{label: string, scope: Closure(Builder<*>|QueryBuilder): mixed}>
+     */
+    protected function recordTabs(): array
+    {
+        return [
+            'all' => ['label' => 'All', 'scope' => fn (Builder|QueryBuilder $query) => $query],
+            'purple' => ['label' => 'Purple', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('colour', 'purple')],
+            'pricey' => ['label' => 'Pricey', 'scope' => fn (Builder|QueryBuilder $query) => $query->where('price', '>=', 500)],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function bulkActions(): array
+    {
+        return ['describeSelected' => 'Describe selected', 'askToRemoveSelected' => 'Remove selected'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function dangerousBulkActions(): array
+    {
+        return ['askToRemoveSelected'];
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function askToRemoveSelected(array $keys): void
+    {
+        $this->confirm('removeSelected', [$keys], 'Remove the selected fruit?', 'This cannot be undone.', 'Remove fruit');
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function removeSelected(array $keys): void
+    {
+        Fruit::query()->whereKey($keys)->delete();
+        $this->lastAction = 'Removed: '.count($keys);
+        $this->clearSelection();
+    }
+
+    /**
+     * @param  list<string>  $keys
+     */
+    protected function describeSelected(array $keys): void
+    {
+        $this->lastAction = 'Selected: '.Fruit::query()->whereKey($keys)->orderBy('name')->pluck('name')->implode(', ');
+    }
+
+    public function inspect(int $id): void
+    {
+        $this->lastAction = 'Inspected: '.Fruit::query()->whereKey($id)->value('name');
+    }
 
     public function unrelatedAction(): void
     {

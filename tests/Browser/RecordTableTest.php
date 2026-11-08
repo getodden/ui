@@ -19,24 +19,24 @@ it('sorts when a header is clicked and flips aria-sort', function (): void {
     $page = visit('/');
 
     $page->assertNoJavaScriptErrors()
-        ->assertScript(sortAttribute('1').' === "ascending"')
-        ->assertScript(sortAttribute('3').' === null')
-        ->click('#fruit-table thead th:nth-child(1) button')
-        ->assertScript(sortAttribute('1').' === "descending"')
+        ->assertScript(sortAttribute('2').' === "ascending"')
+        ->assertScript(sortAttribute('4').' === null')
+        ->click('#fruit-table thead th:nth-child(2) button')
+        ->assertScript(sortAttribute('2').' === "descending"')
         ->assertScript(firstFruit().' === "Raspberry"')
-        ->click('#fruit-table thead th:nth-child(3) button')
-        ->assertScript(sortAttribute('3').' === "ascending"')
-        ->assertScript(sortAttribute('1').' === null')
+        ->click('#fruit-table thead th:nth-child(4) button')
+        ->assertScript(sortAttribute('4').' === "ascending"')
+        ->assertScript(sortAttribute('2').' === null')
         ->assertScript(firstFruit().' === "Lime"');
 });
 
 it('sorts from the keyboard', function (): void {
     $page = visit('/');
 
-    $page->script('document.querySelector("#fruit-table thead th:nth-child(3) button").focus()');
+    $page->script('document.querySelector("#fruit-table thead th:nth-child(4) button").focus()');
 
     $page->keys(':focus', 'Enter')
-        ->assertScript(sortAttribute('3').' === "ascending"')
+        ->assertScript(sortAttribute('4').' === "ascending"')
         ->assertScript(firstFruit().' === "Lime"')
         ->assertScript('document.activeElement.closest("th").getAttribute("aria-sort") === "ascending"');
 });
@@ -44,7 +44,7 @@ it('sorts from the keyboard', function (): void {
 it('reaches the header buttons with Tab in reading order', function (): void {
     $page = visit('/');
 
-    $page->script('document.querySelector("#fruit-unrelated").focus()');
+    $page->script('document.querySelector("#fruit-table thead input[type=checkbox]").focus()');
     $page->keys(':focus', 'Tab')
         ->assertScript('document.activeElement.textContent.trim() === "Name"')
         ->keys(':focus', 'Tab')
@@ -99,7 +99,7 @@ it('shows the empty state when nothing matches', function (): void {
 
     $page->type('#fruit-search', 'zzzz')
         ->assertSee('No fruit matches your search.')
-        ->assertScript('document.querySelector("#fruit-table tbody td").getAttribute("colspan") === "3"')
+        ->assertScript('document.querySelector("#fruit-table tbody td").getAttribute("colspan") === "5"')
         ->assertNoJavaScriptErrors()
         ->assertNoAccessibilityIssues();
 });
@@ -108,7 +108,7 @@ it('shows the current state from the url on load', function (): void {
     $page = visit('/?search=berry&sort=price&direction=desc&filters[colour]=red');
 
     $page->assertSee('Raspberry')
-        ->assertScript(sortAttribute('3').' === "descending"')
+        ->assertScript(sortAttribute('4').' === "descending"')
         ->assertScript(firstFruit().' === "Raspberry"')
         ->assertScript(FRUIT_NAMES.' === 2');
 });
@@ -174,4 +174,165 @@ it('loads a page with invalid UTF-8 in the query string', function (): void {
 
 it('has no accessibility issues', function (): void {
     visit('/')->assertNoAccessibilityIssues();
+});
+
+it('selects the page, announces the count and runs a bulk action', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table thead input[type=checkbox]')
+        ->assertScript('document.querySelectorAll("#fruit-table tbody input[type=checkbox]:checked").length === 10')
+        ->assertSee('Describe selected')
+        ->assertScript('document.querySelector("#fruit-table").closest("div.space-y-4").querySelector("[role=status]").textContent.includes("10 rows selected")')
+        ->click('#fruit-table thead input[type=checkbox]')
+        ->assertScript('document.querySelectorAll("#fruit-table tbody input[type=checkbox]:checked").length === 0')
+        ->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
+        ->click('Describe selected')
+        ->assertScript('document.querySelector("#fruit-last-action").textContent === "Selected: Apricot"')
+        ->assertScript('document.querySelectorAll("#fruit-table tbody input[type=checkbox]:checked").length === 0');
+});
+
+it('keeps keyboard focus on the page checkbox after a bulk action removes the bar', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
+        ->click('Describe selected')
+        ->wait(0.5)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});
+
+it('clears the selection when the tab changes', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:first-child input[type=checkbox]')
+        ->click('Purple')
+        ->assertScript('document.querySelectorAll("#fruit-table tbody input[type=checkbox]:checked").length === 0')
+        ->assertScript('new URL(location.href).searchParams.get("tab") === "purple"')
+        ->assertScript('document.querySelector("nav button[aria-current]").textContent.trim() === "Purple"');
+});
+
+it('opens the row menu from the keyboard, moves with arrows and closes with Escape', function (): void {
+    $page = visit('/');
+
+    $trigger = '#fruit-table tbody tr:first-child button[aria-haspopup=menu]';
+    $page->script('document.querySelector("'.$trigger.'").focus()');
+
+    $page->keys(':focus', 'Enter')
+        ->wait(0.5)
+        ->assertScript('document.querySelector("'.$trigger.'").getAttribute("aria-expanded") === "true"')
+        ->assertScript('document.activeElement.getAttribute("role") === "menuitem"')
+        ->keys(':focus', 'Escape')
+        ->wait(0.3)
+        ->assertScript('document.querySelector("'.$trigger.'").getAttribute("aria-expanded") === "false"')
+        ->assertScript('document.activeElement === document.querySelector("'.$trigger.'")')
+        ->keys(':focus', 'ArrowDown')
+        ->wait(0.3)
+        ->assertScript('document.activeElement.getAttribute("role") === "menuitem"')
+        ->keys(':focus', 'Enter')
+        ->assertSee('Inspected: Apple');
+});
+
+function firstTrigger(): string
+{
+    return 'document.querySelector("#fruit-table tbody tr:first-child button[aria-haspopup=menu]")';
+}
+
+it('opens on the last item with ArrowUp, jumps with Home and End, and closes on Tab', function (): void {
+    $page = visit('/');
+
+    $page->script(firstTrigger().'.focus()');
+
+    $page->keys(':focus', 'ArrowUp')
+        ->wait(0.5)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
+        ->keys(':focus', 'Home')
+        ->wait(0.3)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]")')
+        ->keys(':focus', 'End')
+        ->wait(0.3)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
+        ->keys(':focus', 'Tab')
+        ->wait(0.3)
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"');
+});
+
+it('closes the row menu on a click outside', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:first-child button[aria-haspopup=menu]')
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "true"')
+        ->script('document.querySelector("#fruit-table tbody tr:nth-child(3) th").click()');
+
+    $page
+        ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"');
+});
+
+it('closes the row menu on scroll and moves focus back only when it was inside the menu', function (): void {
+    $page = visit('/');
+
+    $page->script(firstTrigger().'.focus()');
+    $page->keys(':focus', 'Enter')
+        ->wait(0.5)
+        ->assertScript('document.activeElement.getAttribute("role") === "menuitem"')
+        ->script('window.dispatchEvent(new Event("scroll"))');
+
+    $page->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"')
+        ->assertScript('document.activeElement === '.firstTrigger());
+
+    $page->script(firstTrigger().'.click()');
+    $page->wait(0.5);
+    $page->script('document.activeElement.blur(); window.dispatchEvent(new Event("scroll"))');
+
+    $page->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"')
+        ->assertScript('document.activeElement !== '.firstTrigger());
+});
+
+it('opens the row menu above the trigger when there is no room below', function (): void {
+    $page = visit('/');
+
+    $page->script('document.body.style.paddingBottom = "2000px"; const row = document.querySelector("#fruit-table tbody tr:last-child"); window.scrollTo(0, row.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 4)');
+    $page->wait(0.5);
+    $page->script('document.querySelector("#fruit-table tbody tr:last-child button[aria-haspopup=menu]").click()');
+
+    $page->wait(0.5)
+        ->assertScript('(() => { const trigger = document.querySelector("#fruit-table tbody tr:last-child button[aria-haspopup=menu]").getBoundingClientRect(); const menu = document.querySelector("#fruit-table tbody tr:last-child [role=menu]").getBoundingClientRect(); return menu.bottom <= trigger.top + 1 })()');
+});
+
+it('keeps the page checkbox in step with the page rows and focuses it after clearing the selection', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:first-child input[type=checkbox]')
+        ->wait(0.5)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").indeterminate === true');
+
+    $page->script('const box = document.querySelector("#fruit-table thead input[type=checkbox]"); box.setAttribute("data-keys", JSON.stringify(JSON.parse(box.dataset.keys).slice(1)))');
+
+    $page->wait(0.5)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").indeterminate === false')
+        ->click('Clear selection')
+        ->wait(0.5)
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});
+
+it('returns focus to the page checkbox after a confirmed bulk action removes the bar', function (): void {
+    $page = visit('/');
+
+    $page->click('#fruit-table tbody tr:nth-child(2) input[type=checkbox]')
+        ->click('Remove selected')
+        ->wait(0.5)
+        ->click('Remove fruit')
+        ->wait(0.8)
+        ->assertScript('document.querySelector("#fruit-last-action").textContent === "Removed: 1"')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead input[type=checkbox]")');
+});
+
+it('returns focus to a sortable header when a confirmed bulk action removes every row on the page', function (): void {
+    $page = visit('/?search=Kiwi');
+
+    $page->click('#fruit-table thead input[type=checkbox]')
+        ->click('Remove selected')
+        ->wait(0.5)
+        ->click('Remove fruit')
+        ->wait(0.8)
+        ->assertScript('document.querySelector("#fruit-table thead input[type=checkbox]").disabled')
+        ->assertScript('document.activeElement === document.querySelector("#fruit-table thead button")');
 });
