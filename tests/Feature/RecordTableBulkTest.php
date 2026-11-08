@@ -9,8 +9,10 @@ use Odden\Ui\Livewire\Concerns\WithRecordTable;
 use Odden\Ui\Support\RecordTableReads;
 use Odden\Ui\Tests\Support\BulkRecordTableComponent;
 use Odden\Ui\Tests\Support\Html;
+use Odden\Ui\Tests\Support\NameKeyedRecordTableComponent;
 use Odden\Ui\Tests\Support\OwnConfirmingFlagRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
+use Odden\Ui\Tests\Support\UnsafeTabRecordTableComponent;
 use Odden\Ui\Tests\Support\WideRecordTableComponent;
 use Workbench\App\Models\Fruit;
 
@@ -279,12 +281,15 @@ it('accepts a collection of selectable keys', function (): void {
     expect(json_decode($dom->querySelector('thead input[type=checkbox]')->getAttribute('data-keys'), true))->toBe(['1', '2']);
 });
 
-it('lets the bulk buttons restore focus to the page checkbox once the bar disappears', function (): void {
+it('recovers focus to the page checkbox once the element that held it is gone', function (): void {
     $dom = Html::parse(Livewire::test(BulkRecordTableComponent::class)->set('selected', fruitIds('Apple'))->html());
 
+    $root = $dom->querySelector('div[data-record-table]');
+
     expect($dom->querySelector('thead input[type=checkbox]')->hasAttribute('data-select-page'))->toBeTrue()
-        ->and($dom->querySelector('[role=group] button')->getAttribute('x-on:click'))->toContain('[data-select-page]')
-        ->and($dom->querySelector('div[data-record-table]')->hasAttribute('x-data'))->toBeFalse();
+        ->and($root->getAttribute('x-data'))->toContain('recoverFocus')
+        ->and($root->getAttribute('x-init'))->toContain('MutationObserver')
+        ->and($dom->querySelector('[role=group] button')->getAttribute('x-on:click'))->not->toContain('.then(');
 });
 
 it('drops selected rows that have left the current page', function (): void {
@@ -323,7 +328,7 @@ it('keeps the selection after a bulk action only when the component uses WithCon
 });
 
 it('clears the selection on a page change even when the host defines updatedPaginators', function (): void {
-    $component = Livewire::test(OwnConfirmingFlagRecordTableComponent::class)->set('selected', fruitIds('Apple'))->call('nextPage');
+    $component = Livewire::test(OwnConfirmingFlagRecordTableComponent::class)->set('selected', fruitIds('Apple'))->set('paginators.page', 2);
 
     expect($component->get('selected'))->toBe([])
         ->and($component->get('received'))->toBe(['scrolled']);
@@ -338,4 +343,36 @@ it('styles dangerous bulk actions as danger and renders link row actions as anch
     expect($buttons[2]->textContent)->toContain('Remove')
         ->and($buttons[2]->className)->not->toBe($buttons[0]->className)
         ->and($link->getAttribute('href'))->toStartWith('/fruit/');
+});
+
+it('keeps a selection keyed by something other than the primary key when the host names the key', function (): void {
+    $component = Livewire::test(NameKeyedRecordTableComponent::class)->set('selected', ['Apple', 'Zebra']);
+
+    expect(json_decode($component->instance()->report(), true))->toBe(['Apple']);
+});
+
+it('keeps the selection when a client-set confirming flag is raised but no confirmation was asked', function (): void {
+    $ids = fruitIds('Apple');
+    $component = Livewire::test(BulkRecordTableComponent::class)->set('selected', $ids)->set('confirming', true)->call('runBulkAction', 'recordSelection');
+
+    expect($component->get('received'))->toBe($ids)
+        ->and($component->get('selected'))->toBe([]);
+});
+
+it('refuses a tab scope that adds more than where clauses', function (): void {
+    expect(fn () => Livewire::test(UnsafeTabRecordTableComponent::class))
+        ->toThrow(ViewException::class, 'Tab [newest] may only add where clauses.');
+});
+
+it('refuses a table state read before the records are paginated', function (): void {
+    expect(fn () => (new NameKeyedRecordTableComponent)->stateWithoutRecords())
+        ->toThrow(LogicException::class, 'Call paginateRecords() before recordTableState().');
+});
+
+it('leaves setPage declared by the pagination trait so write guards keep matching it', function (): void {
+    expect((new ReflectionMethod(BulkRecordTableComponent::class, 'setPage'))->getFileName())->toContain('HandlesPagination.php');
+});
+
+it('quotes record keys in the README examples', function (): void {
+    expect(file_get_contents(__DIR__.'/../../README.md'))->not->toMatch('/wire:click="\w+\(\{\{ \$/');
 });

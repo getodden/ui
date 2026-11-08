@@ -287,9 +287,9 @@ Pass `:selectable-keys="$contacts->pluck('id')"` to add a selection column with 
 
 ```blade
 <x-ui::table.actions :label="'Actions for '.$contact->name">
-    <x-ui::table.action wire:click="edit({{ $contact->id }})">Edit</x-ui::table.action>
+    <x-ui::table.action wire:click="edit({{ \Illuminate\Support\Js::from($contact->id) }})">Edit</x-ui::table.action>
     <x-ui::table.action :href="route('contacts.show', $contact)">Open</x-ui::table.action>
-    <x-ui::table.action danger wire:click="confirmDelete({{ $contact->id }})">Delete</x-ui::table.action>
+    <x-ui::table.action danger wire:click="confirmDelete({{ \Illuminate\Support\Js::from($contact->id) }})">Delete</x-ui::table.action>
 </x-ui::table.actions>
 ```
 
@@ -332,7 +332,7 @@ A filter closure receives the raw string from the request, so validate it there.
 
 A chosen sort replaces any order on your base query, and the model key always breaks ties, so pages stay stable. Search compares `lower(column) like lower(term)`. On PostgreSQL that fails for columns that are not text, such as integers, uuids and json, so search those in your own `applySearch()`. On SQLite only ASCII letters match regardless of case. A page past the end shows the last page.
 
-Tabs are named scopes. Declare them with `recordTabs()`; the first one is the default unless you override `defaultTab()`. The active tab is kept in the URL (`tab`), and a value that is not a key falls back to the default.
+Tabs are named scopes. Declare them with `recordTabs()`; the first one is the default unless you override `defaultTab()`. The active tab is kept in the URL (`tab`), and a value that is not a key falls back to the default. A tab scope may only add where clauses; one that adds a join, order, group, having, union or column list throws a `LogicException`, so put those on the base query.
 
 ```php
 protected function recordTabs(): array
@@ -344,7 +344,7 @@ protected function recordTabs(): array
 }
 ```
 
-Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. After each render the selection keeps only the keys of the rows on the current page. List the methods that should look destructive in `dangerousBulkActions()` and their buttons use the danger style. Load them through your own scoped query and authorise every record before changing it.
+Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. After each render the selection keeps only the keys of the rows on the current page; the key is the model key (or the `id` field of a plain row), and a host that keys its checkboxes by something else overrides `recordKey($record)`. Call `paginateRecords()` before `recordTableState()`, which throws otherwise. List the methods that should look destructive in `dangerousBulkActions()` and their buttons use the danger style. Load them through your own scoped query and authorise every record before changing it.
 
 ```php
 protected function bulkActions(): array
@@ -363,7 +363,7 @@ protected function archiveSelected(array $keys): void
 
 Pass labels as `:label` with a PHP expression, as above, because Blade already escapes `{{ }}` inside an attribute and the component escapes it again. `maximumSelection()` defaults to the largest of 100 and your `perPageOptions()`, so selecting a whole page is never cut short.
 
-The selection is cleared after a bulk action succeeds, and whenever the page, search, sort, filters, per-page or tab changes. If the action throws, the selection stays. If it calls `confirm()` from `WithConfirmation`, the selection also stays while the dialog is open and after Cancel; call `clearSelection()` in the confirmed method. When the bulk bar disappears after an action, focus moves to the select-all checkbox.
+The selection is cleared after a bulk action succeeds, and whenever the page, search, sort, filters, per-page or tab changes. If the action throws, the selection stays. If it calls `confirm()` from `WithConfirmation`, the selection also stays while the dialog is open and after Cancel; call `clearSelection()` in the confirmed method. When the element that held focus leaves the table, including after a confirmation dialog closes, focus moves to the select-all checkbox.
 
 A write guard that denies public Livewire methods by default can allow the trait's own pure reads from `Odden\Ui\Support\RecordTableReads::METHODS`: `sortBy`, `resetFilters`, `setTab`, `clearSelection`, `gotoPage`, `nextPage`, `previousPage`, `setPage` and `resetPage`. `runBulkAction` is not on the list, because it runs your methods.
 

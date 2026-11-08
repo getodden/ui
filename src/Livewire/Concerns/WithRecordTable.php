@@ -17,9 +17,9 @@ use ReflectionMethod;
 
 trait WithRecordTable
 {
-    use WithPagination {
-        setPage as private setPageKeepingSelection;
-    }
+    use WithPagination;
+
+    private bool $recordsPaginated = false;
 
     #[Url(except: '')]
     public mixed $search = '';
@@ -150,12 +150,14 @@ trait WithRecordTable
             $this->direction = 'asc';
         }
 
+        $this->clearSelection();
         $this->resetPage();
     }
 
     public function resetFilters(): void
     {
         $this->filters = [];
+        $this->clearSelection();
         $this->resetPage();
     }
 
@@ -168,18 +170,8 @@ trait WithRecordTable
         }
 
         $this->tab = $key === $this->resolveDefaultTab($tabs) ? '' : $key;
-        $this->resetPage();
-    }
-
-    /**
-     * @param  int|string  $page
-     * @param  string  $pageName
-     * @return void
-     */
-    public function setPage($page, $pageName = 'page')
-    {
         $this->clearSelection();
-        $this->setPageKeepingSelection($page, $pageName);
+        $this->resetPage();
     }
 
     public function clearSelection(): void
@@ -203,22 +195,27 @@ trait WithRecordTable
             return;
         }
 
+        $pendingBefore = $this->pendingConfirmation();
+
         $this->{$action}($keys);
 
-        if (! $this->awaitingConfirmation()) {
+        if ($this->pendingConfirmation() === $pendingBefore) {
             $this->clearSelection();
         }
     }
 
-    private function awaitingConfirmation(): bool
+    /**
+     * @return array<string, mixed>
+     */
+    private function pendingConfirmation(): array
     {
-        return in_array(WithConfirmation::class, class_uses_recursive($this), true)
-            && property_exists($this, 'confirming')
-            && $this->confirming === true;
+        return in_array(WithConfirmation::class, class_uses_recursive($this), true) ? $this->confirmation : [];
     }
 
     protected function recordTableState(): RecordTableState
     {
+        throw_unless($this->recordsPaginated, LogicException::class, 'Call paginateRecords() before recordTableState().');
+
         $tabs = $this->recordTabs();
 
         return new RecordTableState(
@@ -397,7 +394,10 @@ trait WithRecordTable
         $tab = $this->activeTabIn($tabs);
 
         if ($tab !== null) {
-            $query->where(fn (EloquentBuilder|QueryBuilder $group): mixed => $tabs[$tab]['scope']($group));
+            $query->where(function (EloquentBuilder|QueryBuilder $group) use ($tabs, $tab): void {
+                $tabs[$tab]['scope']($group);
+                $this->assertOnlyWheres($group, $tab);
+            });
         }
 
         if ($sort !== null) {
@@ -409,6 +409,23 @@ trait WithRecordTable
         if ($tiebreak !== null) {
             $query->orderBy($tiebreak);
         }
+    }
+
+    /**
+     * @param  EloquentBuilder<*>|QueryBuilder  $group
+     */
+    private function assertOnlyWheres(EloquentBuilder|QueryBuilder $group, string $tab): void
+    {
+        $base = $group instanceof EloquentBuilder ? $group->getQuery() : $group;
+
+        $addsMore = ($base->joins ?? []) !== []
+            || ($base->orders ?? []) !== []
+            || ($base->groups ?? []) !== []
+            || ($base->havings ?? []) !== []
+            || ($base->unions ?? []) !== []
+            || $base->columns !== null;
+
+        throw_if($addsMore, LogicException::class, "Tab [{$tab}] may only add where clauses.");
     }
 
     /**
@@ -446,8 +463,14 @@ trait WithRecordTable
         }
 
         $this->keepSelectionOn($records);
+        $this->recordsPaginated = true;
 
         return $records;
+    }
+
+    protected function recordKey(mixed $record): mixed
+    {
+        return $record instanceof Model ? $record->getKey() : data_get($record, 'id');
     }
 
     /**
@@ -458,7 +481,7 @@ trait WithRecordTable
         $pageKeys = [];
 
         foreach ($records->items() as $record) {
-            $key = $record instanceof Model ? $record->getKey() : data_get($record, 'id');
+            $key = $this->recordKey($record);
 
             if (! is_int($key) && ! is_string($key)) {
                 return;
