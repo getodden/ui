@@ -13,12 +13,12 @@
 
         @foreach ($records as $fruit)
             <tr wire:key="fruit-{{ $fruit->id }}">
-                <td><x-ui::table.select :value="$fruit->id" label="Select {{ $fruit->name }}" /></td>
+                <td><x-ui::table.select :value="$fruit->id" :label="'Select '.$fruit->name" /></td>
                 <th scope="row">{{ $fruit->name }}</th>
                 <td>{{ $fruit->colour }}</td>
                 <td>{{ $fruit->price }}</td>
                 <td class="text-end">
-                    <x-ui::table.actions label="Actions for {{ $fruit->name }}">
+                    <x-ui::table.actions :label="'Actions for '.$fruit->name">
                         <x-ui::table.action wire:click="inspect({{ $fruit->id }})">Inspect</x-ui::table.action>
                     </x-ui::table.actions>
                 </td>
