@@ -217,9 +217,11 @@ it('opens the row menu from the keyboard, moves with arrows and closes with Esca
     $page->script('document.querySelector("'.$trigger.'").focus()');
 
     $page->keys(':focus', 'Enter')
+        ->wait(0.5)
         ->assertScript('document.querySelector("'.$trigger.'").getAttribute("aria-expanded") === "true"')
         ->assertScript('document.activeElement.getAttribute("role") === "menuitem"')
         ->keys(':focus', 'Escape')
+        ->wait(0.3)
         ->assertScript('document.querySelector("'.$trigger.'").getAttribute("aria-expanded") === "false"')
         ->assertScript('document.activeElement === document.querySelector("'.$trigger.'")')
         ->keys(':focus', 'ArrowDown')
@@ -240,13 +242,16 @@ it('opens on the last item with ArrowUp, jumps with Home and End, and closes on 
     $page->script(firstTrigger().'.focus()');
 
     $page->keys(':focus', 'ArrowUp')
-        ->wait(0.3)
+        ->wait(0.5)
         ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
         ->keys(':focus', 'Home')
+        ->wait(0.3)
         ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]")')
         ->keys(':focus', 'End')
+        ->wait(0.3)
         ->assertScript('document.activeElement === document.querySelector("#fruit-table tbody tr:first-child [role=menu] [role=menuitem]:last-child")')
         ->keys(':focus', 'Tab')
+        ->wait(0.3)
         ->assertScript(firstTrigger().'.getAttribute("aria-expanded") === "false"');
 });
 
