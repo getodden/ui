@@ -283,14 +283,16 @@ Series and segments take their colours in order from `--ui-chart-1` to `--ui-cha
 
 Pass `:selectable-keys="$contacts->pluck('id')->all()"` to add a selection column with a select-all-on-page checkbox, and put `<x-ui::table.select :value="$contact->id" label="Select {{ $contact->name }}" />` in each row. Pass `row-actions` for a trailing column and put a menu in it:
 
+Pass `:selectable-keys="$contacts->pluck('id')"` to add a selection column with a select-all-on-page checkbox, and put `<x-ui::table.select :value="$contact->id" :label="'Select '.$contact->name" />` in each row. Pass `row-actions` for a trailing column and put a menu in it:
+
 ```blade
-<x-ui::table.actions label="Actions for {{ $contact->name }}">
+<x-ui::table.actions :label="'Actions for '.$contact->name">
     <x-ui::table.action wire:click="edit({{ $contact->id }})">Edit</x-ui::table.action>
     <x-ui::table.action danger wire:click="confirmDelete({{ $contact->id }})">Delete</x-ui::table.action>
 </x-ui::table.actions>
 ```
 
-The menu button opens with Enter, Space or the arrow keys; arrows, Home and End move between items, Escape closes it and returns focus to the button. When the state has tabs, they render as buttons above the table, and the active one carries `aria-current`.
+The menu button opens with Enter, Space or the arrow keys; arrows, Home and End move between items, Escape closes it and returns focus to the button. It opens above the button when there is no room below, and it closes when the page scrolls. When the state has tabs, they render as buttons above the table, and the active one carries `aria-current`.
 
 ## Livewire traits
 
@@ -341,7 +343,7 @@ protected function recordTabs(): array
 }
 ```
 
-Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, so the methods themselves can be `protected`. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. Load them through your own scoped query and authorise every record before changing it.
+Bulk actions are methods on your component that receive the selected keys. List them in `bulkActions()` as `method => label`; only listed methods can be reached through `runBulkAction()`, and they must be `protected`: a public one can be called straight from the browser without the checks below, so `runBulkAction()` throws a `LogicException` for it. The keys come from the browser: the trait trims them to scalars, removes duplicates and caps them at `maximumSelection()` (100), but it cannot know which rows the visitor may touch. Load them through your own scoped query and authorise every record before changing it.
 
 ```php
 protected function bulkActions(): array
@@ -353,12 +355,14 @@ protected function archiveSelected(array $keys): void
 {
     foreach (Contact::query()->whereKey($keys)->get() as $contact) {
         $this->authorize('archive', $contact);
-        $archive->handle($contact);
+        app(ArchiveContact::class)->handle($contact);
     }
 }
 ```
 
-The selection is cleared after a bulk action succeeds, and whenever the page, search, sort, filters, per-page or tab changes. If the action throws, the selection stays.
+Pass labels as `:label` with a PHP expression, as above, because Blade already escapes `{{ }}` inside an attribute and the component escapes it again. `maximumSelection()` defaults to the largest of 100 and your `perPageOptions()`, so selecting a whole page is never cut short.
+
+The selection is cleared after a bulk action succeeds, and whenever the page, search, sort, filters, per-page or tab changes. If the action throws, the selection stays. If it calls `confirm()` from `WithConfirmation`, the selection also stays while the dialog is open and after Cancel; call `clearSelection()` in the confirmed method. When the bulk bar disappears after an action, focus moves to the select-all checkbox.
 
 A write guard that denies public Livewire methods by default can allow the trait's own pure reads from `Odden\Ui\Support\RecordTableReads::METHODS`: `sortBy`, `resetFilters`, `setTab`, `clearSelection`, `gotoPage`, `nextPage`, `previousPage`, `setPage` and `resetPage`. `runBulkAction` is not on the list, because it runs your methods.
 
