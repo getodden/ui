@@ -21,6 +21,8 @@ class BoardComponent extends Component
 
     public string $outcome = 'accept';
 
+    public int $pageSize = 2;
+
     protected function boardColumnKeys(): array
     {
         return ['red', 'green', 'yellow'];
@@ -28,7 +30,7 @@ class BoardComponent extends Component
 
     protected function boardPageSize(): int
     {
-        return 2;
+        return $this->pageSize;
     }
 
     protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
@@ -45,6 +47,15 @@ class BoardComponent extends Component
     public function limitOf(string $column): int
     {
         return $this->boardLimit($column);
+    }
+
+    public function rowsAfterSlicing(): int
+    {
+        $query = Fruit::query()->where('colour', 'red');
+
+        $this->boardSlice($query, 'red');
+
+        return $query->get()->count();
     }
 
     public function render(): string

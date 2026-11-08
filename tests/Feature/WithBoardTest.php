@@ -89,13 +89,17 @@ it('refuses to let the browser set the limits', function (): void {
 })->throws(Exception::class, 'Cannot update locked property');
 
 it('caps how many cards a column may ask for', function (): void {
-    $component = Livewire::test(BoardComponent::class);
-
-    for ($i = 0; $i < 600; $i++) {
-        $component->call('loadMoreCards', 'red');
-    }
+    $component = Livewire::test(BoardComponent::class)->set('pageSize', 5000);
 
     expect($component->instance()->limitOf('red'))->toBe(1000);
+
+    $component->call('loadMoreCards', 'red');
+
+    expect($component->instance()->limitOf('red'))->toBe(1000);
+});
+
+it('leaves the host query untouched when it cuts a slice', function (): void {
+    expect(Livewire::test(BoardComponent::class)->instance()->rowsAfterSlicing())->toBe(6);
 });
 
 it('offers every other column in the move to select and not the card\'s own', function (): void {

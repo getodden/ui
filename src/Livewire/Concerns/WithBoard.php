@@ -74,7 +74,7 @@ trait WithBoard
     protected function boardSlice(EloquentBuilder|QueryBuilder $query, string $column): BoardSlice
     {
         $limit = $this->boardLimit($column);
-        $records = $query->limit($limit + 1)->get();
+        $records = (clone $query)->limit($limit + 1)->get();
 
         return new BoardSlice($records->take($limit)->values(), $records->count() > $limit);
     }
