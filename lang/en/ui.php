@@ -37,4 +37,15 @@ return [
         'page' => 'Page',
         'go_to_page' => 'Go to page :page',
     ],
+    'board' => [
+        'empty' => 'No cards',
+        'count' => 'Cards:',
+        'move_to' => 'Move to…',
+        'move_card' => 'Move :card',
+        'show_more' => 'Show more',
+        'show_more_in' => 'cards in :column',
+        'moved' => ':card moved to :column, position :position of :total',
+        'refused' => ':card could not be moved and is back in :column',
+        'failed' => ':card could not be moved because the request failed and is back in :column',
+    ],
 ];

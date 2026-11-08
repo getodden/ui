@@ -1,0 +1,109 @@
+<?php
+
+declare(strict_types=1);
+
+use Livewire\Livewire;
+use Odden\Ui\Tests\Support\BoardComponent;
+use Odden\Ui\Tests\Support\Html;
+use Odden\Ui\Tests\Support\RecordTableFixtures;
+
+beforeEach(function (): void {
+    RecordTableFixtures::install();
+});
+
+it('hands the card, column and position to the host write method', function (): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', 3, 'green', 1)->assertReturned(true)->call('moveCard', '4', 'red', '0')->assertReturned(true);
+
+    expect($component->get('moves'))->toBe([
+        ['card' => '3', 'column' => 'green', 'position' => 1],
+        ['card' => '4', 'column' => 'red', 'position' => 0],
+    ]);
+});
+
+it('returns true when the host accepts and false when it refuses', function (string $outcome, bool $expected): void {
+    Livewire::test(BoardComponent::class)->set('outcome', $outcome)->call('moveCard', '1', 'red', 0)->assertReturned($expected);
+})->with([['accept', true], ['refuse', false], ['forbid', false]]);
+
+it('never calls the host for a column that is not on the board', function (mixed $column): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', '1', $column, 0)->assertReturned(false);
+
+    expect($component->get('moves'))->toBe([]);
+})->with([['purple'], [''], ['RED'], ['red '], [null], [['red']], [1.5], [true]]);
+
+it('never calls the host for a card id or position it cannot trust', function (mixed $card, mixed $position): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', $card, 'red', $position)->assertReturned(false);
+
+    expect($component->get('moves'))->toBe([]);
+})->with([
+    'array id' => [['1'], 0],
+    'null id' => [null, 0],
+    'empty id' => ['', 0],
+    'oversized id' => [str_repeat('9', 101), 0],
+    'invalid utf-8 id' => ["\xB1\x31", 0],
+    'text position' => ['1', 'first'],
+    'float position' => ['1', 1.5],
+    'array position' => ['1', [0]],
+    'huge digit position' => ['1', str_repeat('9', 40)],
+]);
+
+it('clamps a negative or absurd position before it reaches the host', function (int $position, int $expected): void {
+    $component = Livewire::test(BoardComponent::class)->call('moveCard', '1', 'red', $position);
+
+    expect($component->get('moves')[0]['position'])->toBe($expected);
+})->with([[PHP_INT_MAX, 100000], [-5, 0]]);
+
+it('shows the first page of every column and a show more button only where more cards exist', function (): void {
+    $dom = Html::render('{!! $html !!}', ['html' => Livewire::test(BoardComponent::class)->html()]);
+
+    $columns = $dom->querySelectorAll('[data-board-column]');
+    $red = $columns[0];
+
+    expect($columns)->toHaveCount(3)
+        ->and($red->querySelectorAll('[data-board-card]'))->toHaveCount(2)
+        ->and(trim($red->querySelector('[data-board-count]')->textContent))->toBe('6')
+        ->and(trim($red->querySelector('[data-board-total]')->textContent))->toBe('6 items')
+        ->and($red->querySelector('button[wire\\:click]'))->not->toBeNull()
+        ->and($columns[2]->querySelectorAll('[data-board-card]'))->toHaveCount(2);
+});
+
+it('loads another page of a column and caps the limit', function (): void {
+    $component = Livewire::test(BoardComponent::class)->call('loadMoreCards', 'red');
+
+    expect($component->instance()->limitOf('red'))->toBe(4)
+        ->and($component->instance()->limitOf('green'))->toBe(2)
+        ->and(substr_count($component->html(), 'data-board-card='))->toBe(4 + 2 + 2);
+
+    $component->call('loadMoreCards', 'red')->call('loadMoreCards', 'red');
+
+    expect($component->html())->not->toContain('wire:click="loadMoreCards(&#039;red&#039;)"');
+});
+
+it('ignores a load more request for an unknown column', function (): void {
+    $component = Livewire::test(BoardComponent::class)->call('loadMoreCards', 'purple')->call('loadMoreCards', ['red']);
+
+    expect($component->get('boardLimits'))->toBe([]);
+});
+
+it('refuses to let the browser set the limits', function (): void {
+    Livewire::test(BoardComponent::class)->set('boardLimits', ['red' => 9999]);
+})->throws(Exception::class, 'Cannot update locked property');
+
+it('caps how many cards a column may ask for', function (): void {
+    $component = Livewire::test(BoardComponent::class);
+
+    for ($i = 0; $i < 600; $i++) {
+        $component->call('loadMoreCards', 'red');
+    }
+
+    expect($component->instance()->limitOf('red'))->toBe(1000);
+});
+
+it('offers every other column in the move to select and not the card\'s own', function (): void {
+    $dom = Html::render('{!! $html !!}', ['html' => Livewire::test(BoardComponent::class)->html()]);
+
+    $select = $dom->querySelectorAll('[data-board-column]')[0]->querySelector('[data-board-card] select');
+    $values = array_map(fn ($option) => $option->getAttribute('value'), iterator_to_array($select->querySelectorAll('option')));
+
+    expect($values)->toBe(['', 'green', 'yellow'])
+        ->and($select->getAttribute('aria-label'))->toStartWith('Move ');
+});
