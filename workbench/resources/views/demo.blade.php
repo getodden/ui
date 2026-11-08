@@ -71,6 +71,7 @@
 
     @include('workbench::charts')
 
+    <livewire:forms-demo />
     <livewire:editor-demo />
     <livewire:repeater-demo />
     <livewire:table-demo />
