@@ -120,7 +120,7 @@ class Deals extends Component
         return ['new', 'won'];
     }
 
-    protected function moveBoardCard(string $cardId, string $toColumn, int $position): bool
+    protected function moveBoardCard(string $cardId, string $toColumn, int $position, ?string $afterCardId): bool
     {
         $deal = Deal::query()->find($cardId);
 
@@ -140,11 +140,15 @@ class Deals extends Component
 }
 ```
 
-A card moves by dragging it, or with the controls on the card, which work with the keyboard and on touch screens: the Move to select sends it to the end of another column, and the up and down buttons move it one place within its column. The page moves the card at once and calls `moveBoardCard()`. When the server answers, the status region announces the position the card has in the list you rendered, and focus goes to the card's control, or to the column heading if your query no longer shows the card. Return `false`, or throw an `AuthorizationException`, to refuse the move: the card goes back and the status region says so. A request that fails does the same.
+A card moves by dragging it, or with the controls on the card, which work with the keyboard and on touch screens: pick a column in the Move to select and press Move to send the card to the end of that column, or use the up and down buttons to move it one place within its column. Choosing in the select does not move anything by itself. The page moves the card at once and calls `moveBoardCard()`. When the server answers, the status region announces the position the card has in the list you rendered, and focus goes to the card's control, or to the column heading if your query no longer shows the card. Return `false`, or throw an `AuthorizationException`, to refuse the move: the card goes back and the status region says so. A request that fails does the same.
 
-The card id arrives from the browser as a string and is not trusted: look the card up through your tenant or policy scope. The column is checked against `boardColumnKeys()` and the position is a non-negative integer, counted among the cards currently shown in that column (the select appends to the end, the buttons shift by one). The write method is never called for anything that fails those checks.
+The card id arrives from the browser as a string and is not trusted: look the card up through your tenant or policy scope. The column is checked against `boardColumnKeys()` and the position is a non-negative integer. The write method is never called for anything that fails those checks.
 
-`boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, a read: if your component classifies public methods as reads or writes, list it as a read. It raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
+`$position` is an index among the cards the browser is showing in that column, and `$afterCardId` is the id of the card the moved card now sits directly below, or `null` when it is first. Prefer `$afterCardId` when you store a manual order: it stays right when other people change the column in the meantime. When the Move to select sends a card to a column that has more cards than are shown, `$position` is `BoardSlice::END_POSITION` and `$afterCardId` is `null`; treat that as the end of the whole column.
+
+Set `:reorderable="false"` on the board when the query decides the order: the up and down buttons go away and a drop inside the same column does nothing. Set `:movable="false"` on the board, or `locked` on a card, when the user may not move cards: those cards have no drag handle and no move controls. Give a column `:heading-level="2"` (2 to 6, default 3) to fit the heading outline of your page. Cards get a `wire:key` of `ui-board-card-{id}` unless you pass your own, which the rollback after a refused move relies on.
+
+`boardSlice($query, $column)` returns the first `boardPageSize()` cards of a column and whether more exist. The column's Show more button calls `loadMoreCards()`, a read. If your component runs behind a write guard that classifies public methods as reads or writes, the guard must be told that `loadMoreCards` from `WithBoard` is a read; a trait method cannot carry your own attribute, so the guard has to list it itself, otherwise a read-only user can never page past the first cards. It raises that column's limit by one page, to at most 1000 cards. Your query decides the order, so a card that was moved shows up where the query puts it once the server answers. The count and total are yours to compute.
 
 ### Table
 

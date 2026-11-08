@@ -74,6 +74,95 @@ it('has a live region for announcing moves', function (): void {
         ->and($region->classList->contains('sr-only'))->toBeTrue();
 });
 
+it('moves a card only when the Move button is pressed, never on the select alone', function (): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha', 'b' => 'Beta']">
+        <x-ui::board.column column="a" label="Alpha" :count="1">
+            <x-ui::board.card id="9" label="Nine">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE);
+
+    $board = $dom->querySelector('[role=group]');
+    $confirm = $dom->querySelector('[data-board-card] button[data-board-confirm]');
+
+    expect($board->hasAttribute('x-on:change'))->toBeFalse()
+        ->and($confirm->getAttribute('aria-label'))->toBe('Move Nine to the chosen column')
+        ->and(trim($confirm->textContent))->toBe('Move');
+});
+
+it('marks the controls aria-disabled while a move is pending instead of disabling the focused one', function (): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha', 'b' => 'Beta']">
+        <x-ui::board.column column="a" label="Alpha" :count="1">
+            <x-ui::board.card id="9" label="Nine">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE);
+
+    foreach ($dom->querySelectorAll('[data-board-card] select, [data-board-card] button') as $control) {
+        expect($control->hasAttribute('x-bind:disabled'))->toBeFalse()
+            ->and($control->getAttribute('x-bind:aria-disabled'))->toBe("pending ? 'true' : null");
+    }
+});
+
+it('gives every card a wire:key unless the host sets one', function (): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha']">
+        <x-ui::board.column column="a" label="Alpha" :count="2">
+            <x-ui::board.card id="9" label="Nine">Body</x-ui::board.card>
+            <x-ui::board.card wire:key="deal-10" id="10" label="Ten">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE);
+
+    $keys = array_map(fn ($card) => $card->getAttribute('wire:key'), iterator_to_array($dom->querySelectorAll('[data-board-card]')));
+
+    expect($keys)->toBe(['ui-board-card-9', 'deal-10']);
+});
+
+it('leaves out the shift buttons on a board that is not reorderable', function (): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha', 'b' => 'Beta']" :reorderable="false">
+        <x-ui::board.column column="a" label="Alpha" :count="1">
+            <x-ui::board.card id="9" label="Nine">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE);
+
+    expect($dom->querySelector('[data-board-shift]'))->toBeNull()
+        ->and($dom->querySelector('[data-board-card] select'))->not->toBeNull()
+        ->and($dom->querySelector('[data-board-card] [data-board-confirm]'))->not->toBeNull();
+});
+
+it('renders cards without drag handle or controls when the board is not movable or the card is locked', function (bool $movable, bool $locked): void {
+    $dom = Html::render(<<<'BLADE'
+    <x-ui::board label="Deals" :columns="['a' => 'Alpha', 'b' => 'Beta']" :movable="$movable">
+        <x-ui::board.column column="a" label="Alpha" :count="1">
+            <x-ui::board.card id="9" label="Nine" :locked="$locked">Body</x-ui::board.card>
+        </x-ui::board.column>
+    </x-ui::board>
+    BLADE, ['movable' => $movable, 'locked' => $locked]);
+
+    $card = $dom->querySelector('[data-board-card]');
+
+    expect($card->getAttribute('draggable'))->toBe('false')
+        ->and($card->querySelector('select, button'))->toBeNull();
+})->with([[false, false], [true, true], [false, true]]);
+
+it('sets the heading level of a column and keeps it between 2 and 6', function (int $given, string $tag): void {
+    $dom = Html::render('<x-ui::board label="Deals"><x-ui::board.column column="a" label="Alpha" :heading-level="$level"></x-ui::board.column></x-ui::board>', ['level' => $given]);
+
+    expect($dom->querySelector('[data-board-heading]')->tagName)->toBe($tag);
+})->with([[2, 'H2'], [5, 'H5'], [1, 'H2'], [9, 'H6']]);
+
+it('marks a column that has more cards than shown', function (): void {
+    $dom = Html::render('<x-ui::board label="Deals"><x-ui::board.column column="a" label="Alpha" :has-more="true"></x-ui::board.column><x-ui::board.column column="b" label="Beta"></x-ui::board.column></x-ui::board>');
+
+    expect($dom->querySelector('[data-board-list="a"]')->hasAttribute('data-board-more'))->toBeTrue()
+        ->and($dom->querySelector('[data-board-list="b"]')->hasAttribute('data-board-more'))->toBeFalse();
+});
+
 it('renders up and down buttons and a focusable heading for the keyboard', function (): void {
     $dom = Html::render(<<<'BLADE'
     <x-ui::board label="Deals" :columns="['a' => 'Alpha']">

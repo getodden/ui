@@ -42,6 +42,8 @@ return [
         'count' => 'Cards:',
         'move_to' => 'Move to…',
         'move_card' => 'Move :card',
+        'move' => 'Move',
+        'move_confirm' => 'Move :card to the chosen column',
         'show_more' => 'Show more',
         'show_more_in' => 'cards in :column',
         'moved' => ':card moved to :column, position :position of :total',

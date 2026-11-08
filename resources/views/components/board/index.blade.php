@@ -1,4 +1,4 @@
-@props(['label' => null, 'columns' => []])
+@props(['label' => null, 'columns' => [], 'movable' => true, 'reorderable' => true])
 
 @php
     throw_if(
@@ -20,6 +20,8 @@
     @if (filled($label)) aria-label="{{ $label }}" @endif
     x-data="{
         pending: false,
+        reorderable: @js((bool) $reorderable),
+        endPosition: @js(\Odden\Ui\Support\BoardSlice::END_POSITION),
         dragging: null,
         over: null,
         message: '',
@@ -89,28 +91,31 @@
             this.dragging = null
             this.over = null
         },
-        select(event) {
-            const select = event.target
-            const card = select.closest?.('[data-board-card]')
-            if (!card || !select.hasAttribute('data-board-move')) return
+        confirm(card) {
+            const select = card.querySelector('[data-board-move]')
+            if (!select || this.pending) return
             const key = select.value
-            select.value = ''
             if (key === '') return
             const list = this.listElement(key)
             if (!list) return
-            this.move(card, key, this.cardsIn(list).filter((other) => other !== card).length)
+            select.value = ''
+            this.move(card, key, this.cardsIn(list).filter((other) => other !== card).length, list.hasAttribute('data-board-more'))
         },
-        shift(event) {
-            const button = event.target.closest?.('[data-board-shift]')
+        click(event) {
+            const button = event.target.closest?.('[data-board-shift], [data-board-confirm]')
             const card = button?.closest('[data-board-card]')
             if (!card || !button) return
+            if (button.hasAttribute('data-board-confirm')) {
+                this.confirm(card)
+                return
+            }
             const list = card.parentElement
             this.move(card, list.dataset.boardList, this.cardsIn(list).indexOf(card) + parseInt(button.dataset.boardShift, 10))
         },
-        async move(card, key, position) {
+        async move(card, key, position, toEnd = false) {
             const target = this.listElement(key)
             const source = card.parentElement
-            if (this.pending || !target) return
+            if (this.pending || !target || (source === target && !this.reorderable)) return
             const rest = this.cardsIn(target).filter((other) => other !== card)
             const toIndex = Math.min(Math.max(position, 0), rest.length)
             if (source === target && this.cardsIn(source).indexOf(card) === toIndex) return
@@ -127,7 +132,7 @@
             focused?.focus()
             let outcome = 'failed'
             try {
-                outcome = (await this.$wire.moveCard(card.dataset.boardCard, key, toIndex)) === true ? 'moved' : 'refused'
+                outcome = (await this.$wire.moveCard(card.dataset.boardCard, key, toEnd ? this.endPosition : toIndex, toEnd ? null : (rest[toIndex - 1]?.dataset.boardCard ?? null))) === true ? 'moved' : 'refused'
             } catch (error) {
                 outcome = 'failed'
             }
@@ -164,8 +169,7 @@
     x-on:dragover="dragOver($event)"
     x-on:drop="drop($event)"
     x-on:dragend="dragEnd()"
-    x-on:change="select($event)"
-    x-on:click="shift($event)"
+    x-on:click="click($event)"
     x-bind:aria-busy="pending ? 'true' : null"
     {{ $attributes->class(['flex items-start gap-4 overflow-x-auto pb-2']) }}
 >
