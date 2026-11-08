@@ -1,4 +1,4 @@
-@props(['id', 'label' => null, 'hint' => null, 'error' => null, 'required' => false, 'inline' => false])
+@props(['id', 'label' => null, 'hint' => null, 'error' => null, 'required' => false, 'inline' => false, 'identified' => false])
 
 <div class="space-y-1.5">
     @if ($inline)

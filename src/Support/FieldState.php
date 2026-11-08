@@ -85,6 +85,10 @@ final readonly class FieldState
         $key = str_replace(['[]', '[', ']'], ['', '.', ''], $name);
         $message = $bag->first($key);
 
+        if ($message === '') {
+            $message = $bag->first($key.'.*');
+        }
+
         return $message === '' ? null : $message;
     }
 }

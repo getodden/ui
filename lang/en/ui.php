@@ -83,4 +83,16 @@ return [
         'removed' => ':row removed',
         'moved' => ':row is now at position :position of :total',
     ],
+    'multiselect' => [
+        'placeholder' => 'Select options',
+        'count' => ':count selected',
+    ],
+    'combobox' => [
+        'searching' => 'Searching…',
+        'no_matches' => 'No matches',
+        'one_result' => '1 result available',
+        'many_results' => ':count results available',
+    ],
+    'breadcrumbs' => 'Breadcrumb',
+    'not_set' => 'Not set',
 ];
