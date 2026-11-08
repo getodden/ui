@@ -86,9 +86,20 @@ final readonly class FieldState
         $message = $bag->first($key);
 
         if ($message === '') {
-            $message = $bag->first($key.'.*');
+            $message = self::firstListItemError($bag, $key);
         }
 
         return $message === '' ? null : $message;
+    }
+
+    private static function firstListItemError(MessageBag $bag, string $key): string
+    {
+        foreach ($bag->messages() as $errorKey => $messages) {
+            if (preg_match('/^'.preg_quote($key, '/').'\.\d+$/', (string) $errorKey) === 1 && $messages !== []) {
+                return (string) $messages[0];
+            }
+        }
+
+        return '';
     }
 }

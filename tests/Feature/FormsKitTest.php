@@ -118,6 +118,13 @@ it('finds the error of a list item under the list key', function (): void {
     expect($dom->getElementById('ui-photos-error')->textContent)->toBe('Not an image.');
 });
 
+it('does not show the error of a nested field under its list key', function (): void {
+    view()->share('errors', Html::errors(['items.1.name' => 'Too short.']));
+    $dom = Html::render('<x-ui::file label="Items" wire:model="items" multiple />');
+
+    expect($dom->getElementById('ui-items-error'))->toBeNull();
+});
+
 it('prefers the error of the key itself over its items', function (): void {
     view()->share('errors', Html::errors(['tags' => 'Pick two.', 'tags.0' => 'Bad tag.']));
     $dom = Html::render('<x-ui::multiselect label="Tags" wire:model="tags" :options="[\'a\' => \'A\']" />');
