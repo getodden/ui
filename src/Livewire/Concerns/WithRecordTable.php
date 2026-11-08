@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Livewire\Attributes\Url;
 use Livewire\WithPagination;
@@ -425,7 +426,13 @@ trait WithRecordTable
             || ($base->unions ?? []) !== []
             || $base->columns !== null;
 
-        throw_if($addsMore, LogicException::class, "Tab [{$tab}] may only add where clauses.");
+        $removedScopes = $group instanceof EloquentBuilder ? $group->removedScopes() : [];
+
+        throw_if(
+            $addsMore || array_diff($removedScopes, [SoftDeletingScope::class]) !== [],
+            LogicException::class,
+            "Tab [{$tab}] may only add where clauses.",
+        );
     }
 
     /**
@@ -466,6 +473,19 @@ trait WithRecordTable
         $this->recordsPaginated = true;
 
         return $records;
+    }
+
+    /**
+     * @param  EloquentBuilder<*>  $base
+     * @return EloquentBuilder<*>
+     */
+    protected function selectedRecords(EloquentBuilder $base): EloquentBuilder
+    {
+        $query = clone $base;
+
+        $this->applyRecordTable($query);
+
+        return $query->whereKey($this->selectedKeys());
     }
 
     protected function recordKey(mixed $record): mixed

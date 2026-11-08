@@ -122,6 +122,14 @@ class BulkRecordTableComponent extends Component
         $this->received = ['unlisted'];
     }
 
+    /**
+     * @return list<int>
+     */
+    public function scopedSelection(): array
+    {
+        return $this->selectedRecords(Fruit::query())->pluck('id')->all();
+    }
+
     public function report(): string
     {
         return json_encode([

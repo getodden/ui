@@ -12,6 +12,7 @@ use Odden\Ui\Tests\Support\Html;
 use Odden\Ui\Tests\Support\NameKeyedRecordTableComponent;
 use Odden\Ui\Tests\Support\OwnConfirmingFlagRecordTableComponent;
 use Odden\Ui\Tests\Support\RecordTableFixtures;
+use Odden\Ui\Tests\Support\ScopeStrippingTabRecordTableComponent;
 use Odden\Ui\Tests\Support\UnsafeTabRecordTableComponent;
 use Odden\Ui\Tests\Support\WideRecordTableComponent;
 use Workbench\App\Models\Fruit;
@@ -177,13 +178,14 @@ it('renders a labelled checkbox per row, a select-all checkbox and a count for a
         ->and(trim($dom->querySelector('[role=status]')->textContent))->toContain('1 row selected');
 });
 
-it('shows the bulk bar only while rows are selected', function (): void {
+it('shows the bulk bar only while rows are selected and reserves its space', function (): void {
     $none = Html::parse(Livewire::test(BulkRecordTableComponent::class)->html());
     $some = Html::parse(Livewire::test(BulkRecordTableComponent::class)->set('selected', fruitIds('Apple'))->html());
 
     $group = $some->querySelector('[role=group]');
 
     expect($none->querySelector('[role=group]'))->toBeNull()
+        ->and($none->querySelector('[data-bulk-slot]'))->not->toBeNull()
         ->and($group)->not->toBeNull()
         ->and($group->querySelectorAll('button'))->toHaveCount(4)
         ->and($group->textContent)->toContain('Record');
@@ -375,4 +377,38 @@ it('leaves setPage declared by the pagination trait so write guards keep matchin
 
 it('quotes record keys in the README examples', function (): void {
     expect(file_get_contents(__DIR__.'/../../README.md'))->not->toMatch('/wire:click="\w+\(\{\{ \$/');
+});
+
+it('refuses a tab scope that removes a global scope', function (): void {
+    expect(fn () => (new ScopeStrippingTabRecordTableComponent)->names())
+        ->toThrow(LogicException::class, 'Tab [all] may only add where clauses.');
+});
+
+it('lets a tab scope lift the soft-deleting scope', function (): void {
+    $component = new ScopeStrippingTabRecordTableComponent;
+    $component->stripGuard = false;
+
+    expect($component->names())->toBe(['Apple', 'Cherry', 'Cranberry', 'Dragonfruit', 'Lychee', 'Raspberry']);
+});
+
+it('resolves selected keys through the active tab at action time', function (): void {
+    $component = new BulkRecordTableComponent;
+    $component->tab = 'red';
+    $component->selected = fruitIds('Apple', 'Banana', 'Cherry');
+
+    expect(Fruit::query()->whereIn('id', $component->scopedSelection())->orderBy('name')->pluck('name')->all())->toBe(['Apple', 'Cherry']);
+});
+
+it('disables the select-all checkbox on a page with no rows', function (): void {
+    $empty = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[]" :selectable-keys="[]" />');
+    $full = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[1]" :selectable-keys="[\'1\']"><tr><td>1</td><td>x</td></tr></x-ui::table>');
+
+    expect($empty->querySelector('[data-select-page]')->hasAttribute('disabled'))->toBeTrue()
+        ->and($full->querySelector('[data-select-page]')->hasAttribute('disabled'))->toBeFalse();
+});
+
+it('guards checkVisibility before recovering focus', function (): void {
+    $dom = Html::render('<x-ui::table caption="Fruit" :columns="[\'a\' => \'A\']" :records="[]" />');
+
+    expect($dom->querySelector('[data-record-table]')->getAttribute('x-data'))->toContain("typeof active.checkVisibility !== 'function'");
 });

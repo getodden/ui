@@ -39,7 +39,7 @@
             const last = this.lastFocused
             if (! last || last.isConnected) return
             const active = document.activeElement
-            if (active && active !== document.body && active.checkVisibility()) return
+            if (active && active !== document.body && (typeof active.checkVisibility !== 'function' || active.checkVisibility())) return
             this.lastFocused = null
             this.$el.querySelector('[data-select-page], thead button')?.focus()
         }
@@ -64,13 +64,17 @@
         <div class="flex flex-wrap items-end gap-3">{{ $toolbar }}</div>
     @endif
 
-    @if ($bulkActions !== [] && $selectedCount > 0)
-        <div role="group" aria-label="{{ __('ui::ui.table.bulk_actions') }}" class="flex flex-wrap items-center gap-2 rounded-surface border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
-            <span aria-hidden="true" class="font-medium">{{ trans_choice('ui::ui.table.selected', $selectedCount) }}</span>
-            @foreach ($bulkActions as $method => $actionLabel)
-                <x-ui::button size="sm" :variant="$state->isDangerousBulkAction((string) $method) ? 'danger' : 'secondary'" x-on:click="$wire.runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }})">{{ $actionLabel }}</x-ui::button>
-            @endforeach
-            <x-ui::button size="sm" variant="ghost" x-on:click="$wire.clearSelection()">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
+    @if ($bulkActions !== [])
+        <div data-bulk-slot class="min-h-12">
+            @if ($selectedCount > 0)
+                <div role="group" aria-label="{{ __('ui::ui.table.bulk_actions') }}" class="flex flex-wrap items-center gap-2 rounded-surface border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-900 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-100">
+                    <span aria-hidden="true" class="font-medium">{{ trans_choice('ui::ui.table.selected', $selectedCount) }}</span>
+                    @foreach ($bulkActions as $method => $actionLabel)
+                        <x-ui::button size="sm" :variant="$state->isDangerousBulkAction((string) $method) ? 'danger' : 'secondary'" x-on:click="$wire.runBulkAction({{ \Illuminate\Support\Js::from((string) $method) }})">{{ $actionLabel }}</x-ui::button>
+                    @endforeach
+                    <x-ui::button size="sm" variant="ghost" x-on:click="$wire.clearSelection()">{{ __('ui::ui.table.clear_selection') }}</x-ui::button>
+                </div>
+            @endif
         </div>
     @endif
 
@@ -98,6 +102,7 @@
                                 x-init="new MutationObserver(() => sync()).observe($el, { attributes: true, attributeFilter: ['data-keys'] })"
                                 aria-label="{{ __('ui::ui.table.select_page') }}"
                                 data-keys="{{ json_encode($pageKeys) }}"
+                                @disabled($pageKeys === [])
                                 class="{{ $checkboxClasses }}"
                                 x-effect="sync()"
                                 x-on:change="const keys = JSON.parse($el.dataset.keys); const chosen = $wire.selected ?? []; $wire.$set('selected', $el.checked ? [...new Set([...chosen, ...keys])] : chosen.filter((key) => ! keys.includes(key)))"
