@@ -111,7 +111,7 @@ it('shows a toast flashed before a redirect on the next page', function (): void
     visit('/')
         ->click('#leave')
         ->assertSee('Saved for later')
-        ->assertScript('document.querySelector("[aria-live]").textContent.includes("Saved for later")');
+        ->assertScript('document.querySelector("[aria-live][tabindex]").textContent.includes("Saved for later")');
 });
 
 it('asks for confirmation, focuses cancel on a danger confirmation and runs the action', function (): void {
